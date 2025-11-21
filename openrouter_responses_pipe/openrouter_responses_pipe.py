@@ -58,7 +58,7 @@ import contextvars
 from concurrent.futures import ThreadPoolExecutor
 import contextlib
 from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Literal, Optional, Type, Union
+from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Literal, Optional, Type, Union, TYPE_CHECKING
 from urllib.parse import urlparse
 
 # Third-party imports
@@ -84,6 +84,10 @@ try:  # optional Redis cache
 except ImportError:  # pragma: no cover - optional dependency
     aioredis = None
 
+if TYPE_CHECKING:
+    from redis.asyncio import Redis as _RedisClient
+else:
+    _RedisClient = Any
 # Open WebUI internals
 from open_webui.models.chats import Chats
 from open_webui.models.models import ModelForm, Models
@@ -1268,7 +1272,7 @@ class Pipe:
             and redis_valve_enabled
         )
         self._redis_enabled = False
-        self._redis_client: Optional[aioredis.Redis] = None
+        self._redis_client: Optional[_RedisClient] = None
         self._redis_listener_task: asyncio.Task | None = None
         self._redis_flush_task: asyncio.Task | None = None
         self._redis_ready_task: asyncio.Task | None = None
@@ -1406,7 +1410,7 @@ class Pipe:
         if aioredis is None:
             self.logger.warning("Redis cache requested but redis-py is unavailable.")
             return
-        client: Optional[aioredis.Redis] = None
+        client: Optional[_RedisClient] = None
         try:
             client = aioredis.from_url(self._redis_url, encoding="utf-8", decode_responses=True)
             await client.ping()
@@ -1769,12 +1773,22 @@ class Pipe:
         try:
             while True:
                 job = await queue.get()
+                if job.future.cancelled():
+                    queue.task_done()
+                    continue
                 task = asyncio.create_task(job.pipe._execute_pipe_job(job))
 
                 def _mark_done(_task: asyncio.Task, q=queue) -> None:
                     q.task_done()
 
                 task.add_done_callback(_mark_done)
+
+                def _propagate_cancel(fut: asyncio.Future, _task: asyncio.Task = task, _job_id: str = job.request_id) -> None:
+                    if fut.cancelled() and not _task.done():
+                        job.pipe.logger.debug("Cancelling in-flight request (request_id=%s)", _job_id)
+                        _task.cancel()
+
+                job.future.add_done_callback(_propagate_cancel)
         except asyncio.CancelledError:  # pragma: no cover - shutdown path
             return
 
@@ -3058,6 +3072,11 @@ class Pipe:
         try:
             result = await future
             return result
+        except asyncio.CancelledError:
+            if not future.done():
+                future.cancel()
+            self.logger.debug("Pipe request cancelled by caller (request_id=%s)", job.request_id)
+            raise
         finally:
             SessionLogger.cleanup()
 
@@ -3397,6 +3416,13 @@ class Pipe:
         emitted_citations: list[dict] = []
         chat_id = metadata.get("chat_id")
         message_id = metadata.get("message_id")
+        model_started = asyncio.Event()
+        responding_status_sent = False
+        provider_status_seen = False
+        generation_started_at: float | None = None
+        generation_last_event_at: float | None = None
+        response_completed_at: float | None = None
+        stream_started_at: float | None = None
 
         async def _flush_pending(reason: str) -> None:
             """Persist buffered artifacts and emit a warning when the DB fails."""
@@ -3430,7 +3456,12 @@ class Pipe:
         if ModelFamily.supports("reasoning", body.model) and event_emitter:
             async def _later(delay: float, msg: str) -> None:
                 """Emit a delayed status update to reassure the user during long thoughts."""
-                await asyncio.sleep(delay)
+                try:
+                    await asyncio.wait_for(model_started.wait(), timeout=delay)
+                    return
+                except asyncio.TimeoutError:
+                    if model_started.is_set():
+                        return
                 await event_emitter({"type": "status", "data": {"description": msg}})
 
             thinking_tasks = []
@@ -3452,10 +3483,25 @@ class Pipe:
                     t.cancel()
                 thinking_tasks.clear()
 
-        start_time = perf_counter()
+        def note_model_activity() -> None:
+            """Mark the stream as active and stop any pending thinking statuses."""
+            if not model_started.is_set():
+                model_started.set()
+                cancel_thinking()
+
+        def note_generation_activity() -> None:
+            """Record when output tokens start/continue streaming."""
+            nonlocal generation_started_at, generation_last_event_at
+            now = perf_counter()
+            generation_last_event_at = now
+            if generation_started_at is None:
+                generation_started_at = now
+
+        request_started_at = perf_counter()
 
         # Send OpenAI Responses API request, parse and emit response
         error_occurred = False
+        was_cancelled = False
         try:
             for _ in range(valves.MAX_FUNCTION_CALL_LOOPS):
                 final_response: dict[str, Any] | None = None
@@ -3475,7 +3521,11 @@ class Pipe:
                     workers=valves.SSE_WORKERS_PER_REQUEST,
                     breaker_key=user_id or None,
                 ):
+                    if stream_started_at is None:
+                        stream_started_at = perf_counter()
                     etype = event.get("type")
+                    if etype:
+                        note_model_activity()
 
                     # Emit OpenRouter SSE frames at DEBUG (non-delta) only; skip delta spam entirely.
                     is_delta_event = bool(etype and etype.endswith(".delta"))
@@ -3486,6 +3536,16 @@ class Pipe:
                     if etype == "response.output_text.delta":
                         delta = event.get("delta", "")
                         if delta:
+                            note_generation_activity()
+                            if not provider_status_seen and not responding_status_sent and event_emitter:
+                                provider_status_seen = True
+                                responding_status_sent = True
+                                await event_emitter(
+                                    {
+                                        "type": "status",
+                                        "data": {"description": "Responding to the user…"},
+                                    }
+                                )
                             assistant_message += delta
                             await event_emitter({"type": "chat:message", "data": {"content": assistant_message}})
                         continue
@@ -3567,7 +3627,9 @@ class Pipe:
                         item_status = item.get("status", "")
 
                         if item_type == "message" and item_status == "in_progress":
-                            if event_emitter:
+                            provider_status_seen = True
+                            if (not responding_status_sent) and event_emitter:
+                                responding_status_sent = True
                                 await event_emitter(
                                     {
                                         "type": "status",
@@ -3691,6 +3753,9 @@ class Pipe:
                     # ─── Capture final response payload for this loop
                     if etype == "response.completed":
                         final_response = event.get("response", {})
+                        response_completed_at = perf_counter()
+                        if generation_started_at is not None:
+                            generation_last_event_at = response_completed_at
                         break
 
                 if final_response is None:
@@ -3762,6 +3827,9 @@ class Pipe:
                     break
 
         # Catch any exceptions during the streaming loop and emit an error
+        except asyncio.CancelledError:
+            was_cancelled = True
+            raise
         except Exception as e:  # pragma: no cover - network errors
             error_occurred = True
             await self._emit_error(event_emitter, f"Error: {str(e)}", show_error_message=True, show_error_log_citation=True, done=True)
@@ -3771,12 +3839,20 @@ class Pipe:
             for t in thinking_tasks:
                 with contextlib.suppress(Exception):
                     await t
-            if not error_occurred and event_emitter:
-                elapsed = max(0.0, perf_counter() - start_time)
+            if (not error_occurred) and (not was_cancelled) and event_emitter:
+                effective_start = stream_started_at or request_started_at
+                elapsed = max(0.0, perf_counter() - effective_start)
+                stream_window = None
+                last_generation_stamp = generation_last_event_at or response_completed_at
+                if last_generation_stamp is not None:
+                    duration = max(0.0, last_generation_stamp - effective_start)
+                    if duration > 0:
+                        stream_window = duration
                 description = self._format_final_status_description(
                     elapsed=elapsed,
                     total_usage=total_usage,
                     valves=valves,
+                    stream_duration=stream_window,
                 )
                 await event_emitter(
                     {
@@ -3786,7 +3862,7 @@ class Pipe:
                             "done": True,
                         },
                     }
-                )
+                    )
 
             if valves.LOG_LEVEL != "INHERIT":
                 session_id = SessionLogger.session_id.get()
@@ -3799,8 +3875,9 @@ class Pipe:
                             session_id,
                         )
 
-            # Emit completion (middleware.py also does this so this just covers if there is a downstream error)
-            await self._emit_completion(event_emitter, content="", usage=total_usage, done=True)  # There must be an empty content to avoid breaking the UI
+            if not was_cancelled:
+                # Emit completion (middleware.py also does this so this just covers if there is a downstream error)
+                await self._emit_completion(event_emitter, content="", usage=total_usage, done=True)  # There must be an empty content to avoid breaking the UI
 
             # Clear logs
             SessionLogger.logs.pop(SessionLogger.session_id.get(), None)
@@ -3808,26 +3885,27 @@ class Pipe:
 
             chat_id = metadata.get("chat_id")
             message_id = metadata.get("message_id")
-            if chat_id and message_id and emitted_citations:
+            if (not was_cancelled) and chat_id and message_id and emitted_citations:
                 Chats.upsert_message_to_chat_by_id_and_message_id(
                     chat_id, message_id, {"sources": emitted_citations}
                 )
 
-            await _flush_pending("finalize")
-            if pending_ulids:
-                marker_lines = [_serialize_marker(ulid) for ulid in pending_ulids]
-                ulid_block = "\n".join(marker_lines)
-                if assistant_message:
+            if not was_cancelled:
+                await _flush_pending("finalize")
+                if pending_ulids:
+                    marker_lines = [_serialize_marker(ulid) for ulid in pending_ulids]
+                    ulid_block = "\n".join(marker_lines)
+                    if assistant_message:
+                        if not assistant_message.endswith("\n"):
+                            assistant_message += "\n"
+                        if not assistant_message.endswith("\n\n"):
+                            assistant_message += "\n"
+                    assistant_message += ulid_block
                     if not assistant_message.endswith("\n"):
                         assistant_message += "\n"
-                    if not assistant_message.endswith("\n\n"):
-                        assistant_message += "\n"
-                assistant_message += ulid_block
-                if not assistant_message.endswith("\n"):
-                    assistant_message += "\n"
 
-            # Return the final output to ensure persistence.
-            return assistant_message
+        # Return the final output to ensure persistence (unless cancelled, in which case the exception propagates).
+        return assistant_message
 
     async def _run_nonstreaming_loop(
         self,
@@ -4601,14 +4679,21 @@ class Pipe:
         elapsed: float,
         total_usage: Dict[str, Any],
         valves: "Pipe.Valves",
+        stream_duration: Optional[float] = None,
     ) -> str:
-        """Return the final status line respecting valve + available metrics."""
+        """Return the final status line respecting valve + available metrics.
+
+        ``stream_duration`` is expected to mirror provider dashboards (request
+        start → last output event, which includes first-token latency).
+        """
         default_description = f"Thought for {elapsed:.1f} seconds"
         if not valves.SHOW_FINAL_USAGE_STATUS:
             return default_description
 
         usage = total_usage or {}
-        segments: list[str] = [f"Time: {elapsed:.2f}s"]
+        time_segment = f"Time: {elapsed:.2f}s"
+        tokens_for_tps: Optional[int] = None
+        segments: list[str] = []
 
         cost = usage.get("cost")
         if isinstance(cost, (int, float)) and cost > 0:
@@ -4632,6 +4717,10 @@ class Pipe:
             candidates = [v for v in (input_tokens, output_tokens) if v is not None]
             if candidates:
                 total_tokens = sum(candidates)
+        if output_tokens is not None:
+            tokens_for_tps = output_tokens
+        elif total_tokens is not None:
+            tokens_for_tps = total_tokens
 
         cached_tokens = _to_int(
             (usage.get("input_tokens_details") or {}).get("cached_tokens")
@@ -4642,13 +4731,13 @@ class Pipe:
 
         token_details: list[str] = []
         if input_tokens is not None:
-            token_details.append(f"I:{input_tokens}")
+            token_details.append(f"Input: {input_tokens}")
         if output_tokens is not None:
-            token_details.append(f"O:{output_tokens}")
+            token_details.append(f"Output: {output_tokens}")
         if cached_tokens is not None and cached_tokens > 0:
-            token_details.append(f"C:{cached_tokens}")
+            token_details.append(f"Cached: {cached_tokens}")
         if reasoning_tokens is not None and reasoning_tokens > 0:
-            token_details.append(f"R:{reasoning_tokens}")
+            token_details.append(f"Reasoning: {reasoning_tokens}")
 
         if total_tokens is not None:
             token_segment = f"Total tokens: {total_tokens}"
@@ -4657,6 +4746,17 @@ class Pipe:
             segments.append(token_segment)
         elif token_details:
             segments.append("Tokens: " + ", ".join(token_details))
+
+        if (
+            tokens_for_tps is not None
+            and stream_duration is not None
+            and stream_duration > 0
+        ):
+            tokens_per_second = tokens_for_tps / stream_duration
+            if tokens_per_second > 0:
+                time_segment = f"{time_segment}  {tokens_per_second:.1f} tps"
+
+        segments.insert(0, time_segment)
 
         description = " | ".join(segments)
         return description or default_description
