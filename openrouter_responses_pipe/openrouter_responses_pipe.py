@@ -3346,7 +3346,6 @@ class Pipe:
                     })
                 except Exception as exc:  # pragma: no cover - UI injection optional
                     self.logger.debug("Status CSS injection failed: %s", exc)
-                    print("Status CSS injection failed for user_id=%s: %s", payload_user_id, exc)
             else:
                 self.logger.debug("Status CSS injection skipped: __event_call__ unavailable.")
 
