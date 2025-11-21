@@ -60,6 +60,7 @@ import contextlib
 from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Literal, Optional, Type, Union, TYPE_CHECKING
 from urllib.parse import urlparse
+import ast
 
 # Third-party imports
 import aiohttp
@@ -1315,6 +1316,7 @@ class Pipe:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             return
+        SessionLogger.set_main_loop(loop)
 
         async def _ensure_worker() -> None:
             async with cls._log_worker_lock:  # type: ignore[arg-type]
@@ -4348,7 +4350,7 @@ class Pipe:
                 continue
             try:
                 raw_args = call.get("arguments") or "{}"
-                args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+                args = self._parse_tool_arguments(raw_args)
             except Exception as exc:
                 breaker_only_skips = False
                 outputs.append(
@@ -4434,7 +4436,7 @@ class Pipe:
                 tasks.append(asyncio.sleep(0, result=RuntimeError("Tool has no callable configured")))
                 continue
             raw_args = call.get("arguments") or "{}"
-            args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
+            args = self._parse_tool_arguments(raw_args)
             if inspect.iscoroutinefunction(fn):
                 tasks.append(fn(**args))
             else:
@@ -4477,6 +4479,22 @@ class Pipe:
     def _is_batchable_tool_call(self, args: dict[str, Any]) -> bool:
         blockers = {"depends_on", "_depends_on", "sequential", "no_batch"}
         return not any(key in args for key in blockers)
+
+    def _parse_tool_arguments(self, raw_args: Any) -> dict[str, Any]:
+        if isinstance(raw_args, dict):
+            return raw_args
+        if isinstance(raw_args, str):
+            try:
+                return json.loads(raw_args)
+            except json.JSONDecodeError:
+                try:
+                    literal_value = ast.literal_eval(raw_args)
+                except (ValueError, SyntaxError) as exc:
+                    raise ValueError("Unable to parse tool arguments") from exc
+                if not isinstance(literal_value, dict):
+                    raise ValueError("Tool arguments must evaluate to an object")
+                return literal_value
+        raise ValueError(f"Unsupported argument type: {type(raw_args).__name__}")
     # 4.7 Emitters (Front-end communication)
     async def _emit_error(
         self,
@@ -4760,6 +4778,7 @@ class SessionLogger:
     logs = defaultdict(lambda: deque(maxlen=2000))
     _session_last_seen: Dict[str, float] = {}
     log_queue: asyncio.Queue[logging.LogRecord] | None = None
+    _main_loop: asyncio.AbstractEventLoop | None = None
     _console_formatter = logging.Formatter("[%(levelname)s] [session=%(session_label)s] [user=%(user_id)s] %(message)s")
     _memory_formatter = logging.Formatter("%(asctime)s [%(levelname)s] [user=%(user_id)s] %(message)s")
 
@@ -4808,6 +4827,9 @@ class SessionLogger:
     @classmethod
     def set_log_queue(cls, queue: asyncio.Queue[logging.LogRecord] | None) -> None:
         cls.log_queue = queue
+    @classmethod
+    def set_main_loop(cls, loop: asyncio.AbstractEventLoop | None) -> None:
+        cls._main_loop = loop
 
     @classmethod
     def _enqueue(cls, record: logging.LogRecord) -> None:
@@ -4815,6 +4837,23 @@ class SessionLogger:
         if queue is None:
             cls.process_record(record)
             return
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
+        if running_loop and running_loop is cls._main_loop:
+            cls._safe_put(queue, record)
+            return
+
+        main_loop = cls._main_loop
+        if main_loop and not main_loop.is_closed():
+            main_loop.call_soon_threadsafe(cls._safe_put, queue, record)
+        else:
+            cls.process_record(record)
+
+    @classmethod
+    def _safe_put(cls, queue: asyncio.Queue[logging.LogRecord], record: logging.LogRecord) -> None:
         try:
             queue.put_nowait(record)
         except asyncio.QueueFull:
