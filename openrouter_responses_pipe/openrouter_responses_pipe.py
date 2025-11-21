@@ -3108,19 +3108,20 @@ class Pipe:
         valves = self._merge_valves(self.valves, user_valves)
         session_id = str(__metadata__.get("session_id") or "")
         user_id = str(__user__.get("id") or __metadata__.get("user_id") or "")
+        safe_event_emitter = self._wrap_safe_event_emitter(__event_emitter__)
 
         if not self._breaker_allows(user_id):  # Fix: user-scoped breaker
             message = "Temporarily disabled due to repeated errors. Please retry later."
-            if __event_emitter__:
-                await self._emit_notification(__event_emitter__, message, level="warning")
+            if safe_event_emitter:
+                await self._emit_notification(safe_event_emitter, message, level="warning")
             SessionLogger.cleanup()
             return message
 
         if self._warmup_failed:
             message = "Service unavailable due to startup issues"
-            if __event_emitter__:
+            if safe_event_emitter:
                 await self._emit_error(
-                    __event_emitter__,
+                    safe_event_emitter,
                     message,
                     show_error_message=True,
                     done=True,
@@ -3140,7 +3141,7 @@ class Pipe:
             body=body,
             user=__user__,
             request=__request__,
-            event_emitter=__event_emitter__,
+            event_emitter=safe_event_emitter,
             event_call=__event_call__,
             metadata=__metadata__,
             tools=__tools__,
@@ -3152,9 +3153,9 @@ class Pipe:
 
         if not self._enqueue_job(job):
             self.logger.warning("Request queue full; rejecting request_id=%s", job.request_id)
-            if __event_emitter__:
+            if safe_event_emitter:
                 await self._emit_error(
-                    __event_emitter__,
+                    safe_event_emitter,
                     "Server busy (503)",
                     show_error_message=True,
                     done=True,
@@ -3172,9 +3173,9 @@ class Pipe:
             raise
         except Exception as exc:  # pragma: no cover - defensive top-level guard
             self.logger.error("Pipe request failed (request_id=%s): %s", job.request_id, exc)
-            if __event_emitter__:
+            if safe_event_emitter:
                 await self._emit_error(
-                    __event_emitter__,
+                    safe_event_emitter,
                     f"Pipe request failed: {exc}",
                     show_error_message=True,
                     done=True,
@@ -4719,6 +4720,25 @@ class Pipe:
                 return literal_value
         raise ValueError(f"Unsupported argument type: {type(raw_args).__name__}")
     # 4.7 Emitters (Front-end communication)
+
+    def _wrap_safe_event_emitter(
+        self,
+        emitter: Callable[[dict[str, Any]], Awaitable[None]] | None,
+    ) -> Callable[[dict[str, Any]], Awaitable[None]] | None:
+        """Return an emitter wrapper that swallows downstream transport errors."""
+
+        if emitter is None:
+            return None
+
+        async def _guarded(event: dict[str, Any]) -> None:
+            try:
+                await emitter(event)
+            except Exception as exc:  # pragma: no cover - emitter transport errors
+                evt_type = event.get("type") if isinstance(event, dict) else None
+                suffix = f" ({evt_type})" if evt_type else ""
+                self.logger.debug("Event emitter failure%s: %s", suffix, exc)
+
+        return _guarded
     async def _emit_error(
         self,
         event_emitter: Callable[[dict[str, Any]], Awaitable[None]],
