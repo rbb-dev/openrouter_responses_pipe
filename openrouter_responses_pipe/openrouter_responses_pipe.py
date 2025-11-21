@@ -496,10 +496,6 @@ class OpenRouterModelRegistry:
         """Return a shallow copy of the cached catalog."""
         return list(cls._models)
 
-    @classmethod
-    def specs(cls) -> Dict[str, Dict[str, Any]]:
-        """Expose the normalized spec cache to callers."""
-        return dict(cls._specs)
 
     @classmethod
     def api_model_id(cls, model_id: str) -> Optional[str]:
@@ -1477,49 +1473,6 @@ class Pipe:
 
         self.logger.debug("Redis periodic flusher stopped")
 
-    async def _verify_write_behind_cycle(self, test_chat_id: str) -> None:
-        """TEMPORARY: sanity-check the write-behind cache path end-to-end."""
-        if not test_chat_id:
-            self.logger.error("🧪 Write-behind cache test failed: chat_id is required")
-            return
-
-        self.logger.debug("🧪 Testing write-behind cache cycle...")
-
-        test_row = {
-            "chat_id": test_chat_id,
-            "message_id": "test_msg_" + generate_item_id(),
-            "model_id": "test_model",
-            "item_type": "test",
-            "payload": {"test": "data", "timestamp": time.time()},
-        }
-
-        ulids = await self._redis_enqueue_rows([test_row])
-        ulid = ulids[0] if ulids else None
-        self.logger.debug("✅ Enqueued test artifact, ID: %s", ulid or "FAILED")
-
-        cached = await self._redis_fetch_rows(test_chat_id, ulids)
-        if cached:
-            self.logger.debug("✅ Artifact found in Redis cache immediately")
-        else:
-            self.logger.error("❌ Artifact NOT in Redis cache (enqueue failed?)")
-
-        if self._redis_client:
-            depth = await self._redis_client.llen(self._redis_pending_key)
-            self.logger.debug("📊 Pending queue depth: %d", depth)
-
-        self.logger.debug("⏳ Waiting up to 15 seconds for DB flush...")
-        for i in range(15):
-            await asyncio.sleep(1)
-            if not ulids:
-                break
-            db_rows = await self._db_fetch_direct(test_chat_id, None, ulids)
-            if db_rows:
-                self.logger.debug("✅ Artifact reached DB after %d seconds", i + 1)
-                break
-        else:
-            self.logger.error("❌ Artifact did NOT reach DB within 15 seconds")
-
-        self.logger.debug("🧪 Write-behind cache test complete")
 
     async def _flush_redis_queue(self) -> None:
         if not (self._redis_enabled and self._redis_client):
@@ -5101,10 +5054,6 @@ def _extract_marker_ulid(line: str) -> str | None:
     return body
 
 
-def is_marker(line: str) -> bool:
-    """Return True when the provided line is an inline ULID marker."""
-    return _extract_marker_ulid(line) is not None
-
 
 def contains_marker(text: str) -> bool:
     """Fast check: does the text contain any embedded ULID markers?
@@ -5143,23 +5092,6 @@ def _iter_marker_spans(text: str) -> list[dict[str, Any]]:
     spans.sort(key=lambda span: span["start"])
     return spans
 
-
-def parse_marker(marker: str) -> dict:
-    """Parse a v3 ULID marker (plain 20-char Crockford string).
-
-    Args:
-        marker: 20-character Crockford ULID line.
-
-    Returns:
-        dict: { "version": "v3", "item_type": None, "ulid": marker, "metadata": {} }
-
-    Raises:
-        ValueError: If the marker does not conform to the ULID format.
-    """
-    ulid_value = _extract_marker_ulid(marker)
-    if not ulid_value:
-        raise ValueError("not a v3 marker")
-    return {"version": "v3", "item_type": None, "ulid": ulid_value, "metadata": {}}
 
 
 def split_text_by_markers(text: str) -> list[dict]:
