@@ -3416,7 +3416,20 @@ class Pipe:
 
         # STEP 4: Auto-enable native function calling if tools are used but `native` function calling is not enabled in Open WebUI model settings.
         if tools and ModelFamily.supports("function_calling", openwebui_model_id):
-            model = Models.get_model_by_id(openwebui_model_id)
+            try:
+                model = Models.get_model_by_id(openwebui_model_id)
+            except Exception as exc:
+                self.logger.warning(
+                    "Failed to inspect model '%s' for function calling: %s",
+                    openwebui_model_id,
+                    exc,
+                )
+                await self._emit_notification(
+                    __event_emitter__,
+                    f"Unable to verify function calling for {openwebui_model_id}. Please ensure it is set to native.",
+                    level="warning",
+                )
+                model = None
             if model:
                 params = dict(model.params or {})
                 if params.get("function_calling") != "native":
@@ -3428,7 +3441,19 @@ class Pipe:
                     params["function_calling"] = "native"
                     form_data = model.model_dump()
                     form_data["params"] = params
-                    Models.update_model_by_id(openwebui_model_id, ModelForm(**form_data))
+                    try:
+                        Models.update_model_by_id(openwebui_model_id, ModelForm(**form_data))
+                    except Exception as exc:
+                        self.logger.warning(
+                            "Failed to update model '%s' function calling setting: %s",
+                            openwebui_model_id,
+                            exc,
+                        )
+                        await self._emit_notification(
+                            __event_emitter__,
+                            f"Unable to persist function calling setting for {openwebui_model_id}. Please update it manually.",
+                            level="warning",
+                        )
 
         # STEP 5: Add tools to responses body, if supported
         if ModelFamily.supports("function_calling", responses_body.model):
