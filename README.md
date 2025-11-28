@@ -8,7 +8,7 @@
 
 This pipe provides seamless integration between Open WebUI and OpenRouter's Responses API. It automatically discovers and imports all Responses-capable models from OpenRouter, translates Open WebUI requests into the Responses format, and manages persistent storage of conversation artifacts. Designed for developers building robust AI applications, it ensures secure, efficient handling of multi-turn interactions, tools, and reasoning while leveraging Open WebUI's ecosystem.
 
-<img width="778" height="500" alt="image" src="https://github.com/user-attachments/assets/00da49a3-6ff0-400e-bb6c-7c540090a593" />
+![clean](https://github.com/user-attachments/assets/65a23a29-33b9-485d-9d0b-7caeca502ae6)
 
 ## Overview
 
