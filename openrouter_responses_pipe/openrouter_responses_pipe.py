@@ -6700,7 +6700,7 @@ class SessionLogger:
     _session_last_seen: Dict[str, float] = {}
     log_queue: asyncio.Queue[logging.LogRecord] | None = None
     _main_loop: asyncio.AbstractEventLoop | None = None
-    _console_formatter = logging.Formatter("[%(levelname)s] [session=%(session_label)s] [user=%(user_id)s] %(message)s")
+    _console_formatter = logging.Formatter("%(asctime)s.%(msecs)03d | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     _memory_formatter = logging.Formatter("%(asctime)s [%(levelname)s] [user=%(user_id)s] %(message)s")
 
     @classmethod
