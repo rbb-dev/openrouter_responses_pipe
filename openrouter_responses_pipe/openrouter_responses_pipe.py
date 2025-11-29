@@ -588,15 +588,11 @@ class OpenRouterModelRegistry:
                 pricing,
             )
 
-            # Extract max_completion_tokens from limits or top_provider
+            # Extract max_completion_tokens from top_provider
             max_completion_tokens: Optional[int] = None
-            limits = full_model.get("limits")
-            if isinstance(limits, dict):
-                max_completion_tokens = limits.get("max_completion_tokens")
-            if max_completion_tokens is None:
-                top_provider = full_model.get("top_provider")
-                if isinstance(top_provider, dict):
-                    max_completion_tokens = top_provider.get("max_completion_tokens")
+            top_provider = full_model.get("top_provider")
+            if isinstance(top_provider, dict):
+                max_completion_tokens = top_provider.get("max_completion_tokens")
 
             # Store full model + derived data for downstream use
             specs[norm_id] = {
