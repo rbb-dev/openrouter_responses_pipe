@@ -7844,18 +7844,23 @@ def _strictify_schema_impl(schema: Dict[str, Any]) -> Dict[str, Any]:
                 node["properties"] = props
 
             raw_required = node.get("required") or []
-            required_names: list[str] = [
-                name for name in raw_required if isinstance(name, str) and name in props
+            raw_required_names: list[str] = [
+                name for name in raw_required if isinstance(name, str)
             ]
-            required_set = set(required_names)
+            all_property_names = list(props.keys())
 
             node["additionalProperties"] = False
-            node["required"] = required_names
+            node["required"] = all_property_names
+
+            explicitly_required = {name for name in raw_required_names if name in props}
+            optional_candidates = {
+                name for name in all_property_names if name not in explicitly_required
+            }
 
             for name, p in props.items():
                 if not isinstance(p, dict):
                     continue
-                if name not in required_set:
+                if name in optional_candidates:
                     ptype = p.get("type")
                     if isinstance(ptype, str) and ptype != "null":
                         p["type"] = [ptype, "null"]
