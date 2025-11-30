@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import datetime
 import sys
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -301,6 +303,53 @@ class TestRemoteFileLimitResolution:
         pipe_instance.valves.REMOTE_FILE_MAX_SIZE_MB = 50
 
         assert pipe_instance._get_effective_remote_file_limit_mb() == 180
+
+
+class TestRetryHelpers:
+    """Unit tests for retry helper utilities."""
+
+    def test_retry_after_seconds_parses_numeric(self):
+        assert pipe_module._retry_after_seconds("5") == 5.0
+        assert pipe_module._retry_after_seconds("0") == 0.0
+        assert pipe_module._retry_after_seconds("") is None
+
+    def test_retry_after_seconds_parses_http_date(self):
+        future = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=3)
+        header = future.strftime("%a, %d %b %Y %H:%M:%S GMT")
+        delay = pipe_module._retry_after_seconds(header)
+        assert delay is not None and delay <= 4.0
+
+    def test_retry_wait_honors_retry_after(self):
+        base_wait = lambda state: 1.0
+        wait = pipe_module._RetryWait(base_wait)
+
+        request = httpx.Request("GET", "https://example.com")
+        response = httpx.Response(status_code=429, request=request)
+        error = httpx.HTTPStatusError("Too many requests", request=request, response=response)
+        retry_exc = pipe_module._RetryableHTTPStatusError(error, retry_after=5.0)
+
+        state = SimpleNamespace(outcome=Mock())
+        state.outcome.exception = Mock(return_value=retry_exc)
+
+        assert wait(state) == 5.0
+
+    def test_classify_retryable_http_error_identifies_425(self):
+        url = "https://example.com/file"
+        request = httpx.Request("GET", url)
+        response = httpx.Response(status_code=425, headers={"Retry-After": "2"}, request=request)
+        error = httpx.HTTPStatusError("Too Early", request=request, response=response)
+        retryable, retry_after = pipe_module._classify_retryable_http_error(error)
+        assert retryable is True
+        assert retry_after == 2.0
+
+    def test_classify_retryable_http_error_rejects_403(self):
+        url = "https://example.com/file"
+        request = httpx.Request("GET", url)
+        response = httpx.Response(status_code=403, request=request)
+        error = httpx.HTTPStatusError("Forbidden", request=request, response=response)
+        retryable, retry_after = pipe_module._classify_retryable_http_error(error)
+        assert retryable is False
+        assert retry_after is None
 
 
 class TestStorageContext:

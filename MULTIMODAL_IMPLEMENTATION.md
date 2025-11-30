@@ -61,7 +61,7 @@ This document describes the comprehensive file, image, and audio input handling 
   - `REMOTE_FILE_MAX_SIZE_MB`: Maximum file size for downloads (default: 50MB, range: 1-500MB). When RAG uploads are enabled in Open WebUI, the effective limit auto-aligns with the configured `FILE_MAX_SIZE`.
   - `BASE64_MAX_SIZE_MB`: Maximum base64 data size (default: 50MB, range: 1-500MB)
 - **Smart retry logic**:
-  - Retries network errors, HTTP 5xx responses, and HTTP 408/429 while skipping other HTTP 4xx
+  - Retries network errors, HTTP 5xx responses, and HTTP 408/425/429 while skipping other HTTP 4xx
   - Logs each retry attempt with timing information
   - Respects remote servers with exponential backoff delays
 
@@ -123,7 +123,7 @@ Downloads file or image from remote HTTP/HTTPS URL with automatic retry using ex
 **Retryable Errors**:
 - Network errors (connection timeout, DNS failure, etc.)
 - `httpx.HTTPStatusError` raised by `response.raise_for_status()` when the status is ≥500
-- HTTP 408/429 rate limit + timeout errors (handled via the same status-error retry path)
+- HTTP 408/425/429 errors (handled via the same status-error retry path)
 
 **Non-Retryable Errors**:
 - Invalid URLs
@@ -135,6 +135,7 @@ Downloads file or image from remote HTTP/HTTPS URL with automatic retry using ex
 - **Timeout**: Capped at 60 seconds per attempt to prevent hanging requests
 - **MIME type normalization**: `image/jpg` → `image/jpeg`
 - **Retry logging**: Logs each retry attempt with timing information
+- **Retry-After aware**: Honors `Retry-After` headers (when present) by stretching the backoff delay for polite retries
 - Returns dict with `data`, `mime_type`, `url` or `None` on failure
 
 #### `_parse_data_url(data_url: str)`

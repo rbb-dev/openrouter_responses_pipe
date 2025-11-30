@@ -64,6 +64,7 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator, Awaitable, Callable, Dict, List, Literal, NotRequired, Optional, Tuple, Type, TypedDict, Union, TYPE_CHECKING
 from urllib.parse import urlparse
 import ast
+import email.utils
 
 # Third-party imports
 import aiohttp
@@ -139,6 +140,37 @@ _REMOTE_FILE_MAX_SIZE_DEFAULT_MB = 50
 _REMOTE_FILE_MAX_SIZE_MAX_MB = 500
 
 
+class _RetryableHTTPStatusError(Exception):
+    """Wrapper that marks an HTTPStatusError as retryable."""
+
+    def __init__(self, original: httpx.HTTPStatusError, retry_after: Optional[float] = None):
+        self.original = original
+        self.retry_after = retry_after
+        status_code = getattr(original.response, "status_code", "unknown")
+        super().__init__(f"Retryable HTTP error ({status_code})")
+
+
+class _RetryWait:
+    """Custom Tenacity wait strategy honoring Retry-After headers."""
+
+    def __init__(self, base_wait):
+        self._base_wait = base_wait
+
+    def __call__(self, retry_state):
+        base_delay = self._base_wait(retry_state) if self._base_wait else 0
+        exc = None
+        if retry_state.outcome is not None:
+            try:
+                exc = retry_state.outcome.exception()
+            except Exception:
+                exc = None
+        if isinstance(exc, _RetryableHTTPStatusError):
+            retry_after = exc.retry_after
+            if isinstance(retry_after, (int, float)) and retry_after > 0:
+                return max(base_delay, retry_after)
+        return base_delay
+
+
 _OPEN_WEBUI_CONFIG_MODULE: Any | None = None
 
 
@@ -188,6 +220,44 @@ def _coerce_bool(value: Any) -> Optional[bool]:
     if isinstance(value, int):
         return bool(value)
     return None
+
+
+def _retry_after_seconds(value: Optional[str]) -> Optional[float]:
+    """Convert Retry-After header value into seconds."""
+    if not value:
+        return None
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    try:
+        seconds = float(trimmed)
+        return max(0.0, seconds)
+    except ValueError:
+        pass
+    try:
+        dt = email.utils.parsedate_to_datetime(trimmed)
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        seconds = (dt - now).total_seconds()
+        return max(0.0, seconds)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _classify_retryable_http_error(
+    exc: httpx.HTTPStatusError,
+) -> tuple[bool, Optional[float]]:
+    """Return (is_retryable, retry_after_seconds) for an HTTPStatusError."""
+    response = exc.response
+    if response is None:
+        return False, None
+    status_code = response.status_code
+    if status_code >= 500 or status_code in {408, 425, 429}:
+        return True, _retry_after_seconds(response.headers.get("retry-after"))
+    return False, None
 
 
 def _read_rag_file_constraints() -> tuple[bool, Optional[int]]:
@@ -4670,7 +4740,7 @@ class Pipe:
             async for attempt_info in AsyncRetrying(
                 retry=retry_if_exception_type((_RetryableHTTPStatusError, httpx.NetworkError, httpx.TimeoutException)),
                 stop=stop_after_attempt(max_retries + 1),  # +1 because first attempt doesn't count as retry
-                wait=wait_exponential(multiplier=initial_delay, min=initial_delay, max=max_retry_time),
+                wait=_RetryWait(wait_exponential(multiplier=initial_delay, min=initial_delay, max=max_retry_time)),
                 reraise=True
             ):
                 with attempt_info:
@@ -4695,9 +4765,9 @@ class Pipe:
                         try:
                             response.raise_for_status()
                         except httpx.HTTPStatusError as exc:
-                            status_code = exc.response.status_code
-                            if status_code >= 500 or status_code in {408, 429}:
-                                raise _RetryableHTTPStatusError(exc) from exc
+                            retryable, retry_after = _classify_retryable_http_error(exc)
+                            if retryable:
+                                raise _RetryableHTTPStatusError(exc, retry_after=retry_after) from exc
                             raise
 
                     # Extract and normalize MIME type
