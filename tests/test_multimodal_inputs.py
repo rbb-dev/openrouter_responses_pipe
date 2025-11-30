@@ -20,7 +20,11 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 import openrouter_responses_pipe.openrouter_responses_pipe as pipe_module
-from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+from openrouter_responses_pipe.openrouter_responses_pipe import (
+    Pipe,
+    ResponsesBody,
+    StatusMessages,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -301,29 +305,72 @@ class TestImageTransformer:
 class TestFileTransformer:
     """Tests for _to_input_file transformer function."""
 
-    def test_file_id_only_passthrough(self):
-        """Should pass through file_id when only that field is present."""
-        pass
+    @pytest.mark.asyncio
+    async def test_file_remote_url_downloaded_and_saved(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        monkeypatch,
+    ):
+        """Remote file_url inputs should be downloaded and re-hosted in OWUI."""
+        remote_url = "https://example.com/manual.pdf"
+        stored_url = "/api/v1/files/remote123"
 
-    def test_file_nested_structure_handled(self):
-        """Should handle nested 'file' object from Chat Completions."""
-        pass
+        download_mock = AsyncMock(
+            return_value={
+                "data": b"%PDF-1.7",
+                "mime_type": "application/pdf",
+                "url": remote_url,
+            }
+        )
+        upload_mock = AsyncMock(return_value=stored_url)
+        status_mock = AsyncMock()
 
-    def test_file_data_url_saved_to_storage(self):
-        """Should save base64 file to OWUI storage."""
-        pass
+        monkeypatch.setattr(pipe_instance, "_download_remote_url", download_mock)
+        monkeypatch.setattr(pipe_instance, "_upload_to_owui_storage", upload_mock)
+        monkeypatch.setattr(pipe_instance, "_emit_status", status_mock)
 
-    def test_file_remote_url_downloaded_and_saved(self):
-        """Should download remote file and save to storage."""
-        pass
+        events: list[dict] = []
 
-    def test_file_all_fields_preserved(self):
-        """Should preserve file_id, filename, file_url, file_data fields."""
-        pass
+        async def event_emitter(event: dict):
+            events.append(event)
 
-    def test_file_error_returns_minimal_block(self):
-        """Should return minimal valid block on error without crashing."""
-        pass
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_file",
+                        "file_url": remote_url,
+                        "filename": "manual.pdf",
+                    }
+                ],
+            }
+        ]
+
+        transformed = await ResponsesBody.transform_messages_to_input(
+            pipe_instance,
+            messages,
+            __request__=mock_request,
+            user_obj=mock_user,
+            event_emitter=event_emitter,
+        )
+
+        assert transformed
+        user_message = transformed[0]
+        assert user_message["role"] == "user"
+        file_block = user_message["content"][0]
+        assert file_block["type"] == "input_file"
+        assert file_block["file_url"] == stored_url
+
+        download_mock.assert_awaited_once_with(remote_url)
+        upload_mock.assert_awaited_once()
+        status_mock.assert_awaited_with(
+            event_emitter,
+            StatusMessages.FILE_REMOTE_SAVED,
+            done=False,
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

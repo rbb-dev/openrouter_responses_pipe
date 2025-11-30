@@ -1294,34 +1294,78 @@ class ResponsesBody(BaseModel):
                         filename = source.get("filename")
                         file_url = source.get("file_url")
 
+                        def _is_internal_storage(url: str) -> bool:
+                            return isinstance(url, str) and ("/api/v1/files/" in url or "/files/" in url)
+
+                        async def _save_bytes_to_storage(
+                            payload: bytes,
+                            mime_type: str,
+                            *,
+                            preferred_name: Optional[str],
+                            status_message: str,
+                        ) -> Optional[str]:
+                            if not (user_obj and __request__):
+                                return None
+                            safe_mime = mime_type or "application/octet-stream"
+                            fname = preferred_name or filename or f"file-{uuid.uuid4().hex}"
+                            if "." not in fname and safe_mime:
+                                ext = safe_mime.split("/")[-1]
+                                fname = f"{fname}.{ext}"
+
+                            internal_url = await self._upload_to_owui_storage(
+                                request=__request__,
+                                user=user_obj,
+                                file_data=payload,
+                                filename=fname,
+                                mime_type=safe_mime,
+                            )
+                            if internal_url:
+                                await self._emit_status(
+                                    event_emitter,
+                                    status_message,
+                                    done=False,
+                                )
+                            return internal_url
+
+                        async def _download_and_store(
+                            remote_url: str,
+                            *,
+                            name_hint: Optional[str] = None,
+                        ) -> Optional[str]:
+                            if not (user_obj and __request__):
+                                return None
+                            downloaded = await self._download_remote_url(remote_url)
+                            if not downloaded:
+                                return None
+                            derived_name = (
+                                name_hint
+                                or remote_url.split("/")[-1].split("?")[0]
+                                or f"file-{uuid.uuid4().hex}"
+                            )
+                            return await _save_bytes_to_storage(
+                                downloaded["data"],
+                                downloaded.get("mime_type") or "application/octet-stream",
+                                preferred_name=derived_name,
+                                status_message=StatusMessages.FILE_REMOTE_SAVED,
+                            )
+
                         # Process file_data if it's a data URL or remote URL
                         if file_data and isinstance(file_data, str):
                             # Handle data URL (base64)
                             if file_data.startswith("data:"):
                                 try:
                                     parsed = self._parse_data_url(file_data)
-                                    if parsed and user_obj:
-                                        # Save to OWUI storage
+                                    if parsed:
                                         fname = filename or f"file-{uuid.uuid4().hex}"
-                                        if "." not in fname and parsed["mime_type"]:
-                                            ext = parsed["mime_type"].split("/")[-1]
-                                            fname = f"{fname}.{ext}"
-
-                                        internal_url = await self._upload_to_owui_storage(
-                                            request=__request__,
-                                            user=user_obj,
-                                            file_data=parsed["data"],
-                                            filename=fname,
-                                            mime_type=parsed["mime_type"]
+                                        internal_url = await _save_bytes_to_storage(
+                                            parsed["data"],
+                                            parsed["mime_type"],
+                                            preferred_name=fname,
+                                            status_message=StatusMessages.FILE_BASE64_SAVED,
                                         )
                                         if internal_url:
                                             file_url = internal_url
                                             file_data = None  # Clear base64, use URL instead
-                                            await self._emit_status(
-                                                event_emitter,
-                                                StatusMessages.FILE_BASE64_SAVED,
-                                                done=False
-                                            )
                                 except Exception as exc:
                                     self.logger.error(f"Failed to process base64 file: {exc}")
                                     await self._emit_error(
@@ -1331,35 +1375,54 @@ class ResponsesBody(BaseModel):
                                     )
 
                             # Handle remote URL (not OWUI file reference)
-                            elif file_data.startswith(("http://", "https://")) and not ("/api/v1/files/" in file_data or "/files/" in file_data):
+                            elif file_data.startswith(("http://", "https://")) and not _is_internal_storage(file_data):
                                 try:
-                                    downloaded = await self._download_remote_url(file_data)
-                                    if downloaded and user_obj:
-                                        fname = filename or file_data.split("/")[-1].split("?")[0] or f"file-{uuid.uuid4().hex}"
-                                        if "." not in fname and downloaded["mime_type"]:
-                                            ext = downloaded["mime_type"].split("/")[-1]
-                                            fname = f"{fname}.{ext}"
-
-                                        internal_url = await self._upload_to_owui_storage(
-                                            request=__request__,
-                                            user=user_obj,
-                                            file_data=downloaded["data"],
-                                            filename=fname,
-                                            mime_type=downloaded["mime_type"]
-                                        )
-                                        if internal_url:
-                                            file_url = internal_url
-                                            file_data = None  # Clear, use URL instead
-                                            await self._emit_status(
-                                                event_emitter,
-                                                StatusMessages.FILE_REMOTE_SAVED,
-                                                done=False
-                                            )
+                                    fname = filename or file_data.split("/")[-1].split("?")[0]
+                                    internal_url = await _download_and_store(file_data, name_hint=fname)
+                                    if internal_url:
+                                        file_url = internal_url
+                                        file_data = None  # Clear, use URL instead
                                 except Exception as exc:
                                     self.logger.error(f"Failed to download remote file: {exc}")
                                     await self._emit_error(
                                         event_emitter,
                                         f"Failed to download file: {exc}",
+                                        show_error_message=False
+                                    )
+
+                        # Process file_url when it's provided and points to remote or base64 data
+                        if file_url and isinstance(file_url, str):
+                            if file_url.startswith("data:"):
+                                try:
+                                    parsed = self._parse_data_url(file_url)
+                                    if parsed:
+                                        fname = filename or f"file-{uuid.uuid4().hex}"
+                                        internal_url = await _save_bytes_to_storage(
+                                            parsed["data"],
+                                            parsed["mime_type"],
+                                            preferred_name=fname,
+                                            status_message=StatusMessages.FILE_BASE64_SAVED,
+                                        )
+                                        if internal_url:
+                                            file_url = internal_url
+                                except Exception as exc:
+                                    self.logger.error(f"Failed to process base64 file_url: {exc}")
+                                    await self._emit_error(
+                                        event_emitter,
+                                        f"Failed to save base64 file URL: {exc}",
+                                        show_error_message=False
+                                    )
+                            elif file_url.startswith(("http://", "https://")) and not _is_internal_storage(file_url):
+                                try:
+                                    name_hint = filename or file_url.split("/")[-1].split("?")[0]
+                                    internal_url = await _download_and_store(file_url, name_hint=name_hint)
+                                    if internal_url:
+                                        file_url = internal_url
+                                except Exception as exc:
+                                    self.logger.error(f"Failed to download remote file_url: {exc}")
+                                    await self._emit_error(
+                                        event_emitter,
+                                        f"Failed to download file URL: {exc}",
                                         show_error_message=False
                                     )
 
