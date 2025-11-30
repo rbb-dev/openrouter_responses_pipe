@@ -1791,6 +1791,9 @@ class ResponsesBody(BaseModel):
         chat_id: Optional[str] = None,
         openwebui_model_id: Optional[str] = None,
         *,
+        request: Optional[Request] = None,
+        user_obj: Optional[Any] = None,
+        event_emitter: Optional[Callable] = None,
         artifact_loader: Optional[
             Callable[[Optional[str], Optional[str], List[str]], Awaitable[Dict[str, Dict[str, Any]]]]
         ] = None,
@@ -1871,6 +1874,9 @@ class ResponsesBody(BaseModel):
                 artifact_loader=artifact_loader,
                 pruning_turns=pruning_turns,
                 replayed_reasoning_refs=replayed_reasoning_refs,
+                __request__=request,
+                user_obj=user_obj,
+                event_emitter=event_emitter,
             )
             if replayed_reasoning_refs:
                 sanitized_params["_replayed_reasoning_refs"] = replayed_reasoning_refs
@@ -4924,6 +4930,14 @@ class Pipe:
 
         # STEP 1: Transform request body (Completions API -> Responses API).
         completions_body = CompletionsBody.model_validate(body)
+
+        # Resolve full Open WebUI user model for uploads/status events.
+        user_model = None
+        if user_id:
+            try:
+                user_model = await self._get_user_by_id(user_id)
+            except Exception:  # pragma: no cover - defensive guard
+                user_model = None
         responses_body = await ResponsesBody.from_completions(
             completions_body=completions_body,
 
@@ -4933,6 +4947,9 @@ class Pipe:
             artifact_loader=self._db_fetch,
             pruning_turns=valves.TOOL_OUTPUT_RETENTION_TURNS,
             transformer_context=self,
+            request=__request__,
+            user_obj=user_model,
+            event_emitter=__event_emitter__,
 
         )
         self._apply_reasoning_preferences(responses_body, valves)
