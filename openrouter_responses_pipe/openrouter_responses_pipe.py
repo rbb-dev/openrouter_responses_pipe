@@ -52,6 +52,7 @@ import random
 import time
 import hashlib
 import base64
+import binascii
 import functools
 from time import perf_counter
 from collections import defaultdict, deque
@@ -1493,59 +1494,172 @@ class ResponsesBody(BaseModel):
                     """
                     try:
                         audio_payload = block.get("input_audio") or block.get("data") or block.get("blob")
+                        format_map = {
+                            "audio/mpeg": "mp3",
+                            "audio/mp3": "mp3",
+                            "audio/wav": "wav",
+                            "audio/wave": "wav",
+                            "audio/x-wav": "wav",
+                        }
+                        supported_formats = {"mp3", "wav"}
 
-                        # If already in correct format, return as-is
-                        if isinstance(audio_payload, dict) and "data" in audio_payload and "format" in audio_payload:
-                            return {
-                                "type": "input_audio",
-                                "input_audio": audio_payload
-                            }
+                        def _map_format(mime: Optional[str]) -> str:
+                            if not isinstance(mime, str):
+                                return "mp3"
+                            return format_map.get(mime.lower(), "mp3")
 
-                        # Need to convert to Responses format
-                        if isinstance(audio_payload, str):
-                            # Determine format from MIME type or default to mp3
-                            mime_type = block.get("mimeType", "audio/mp3")
-                            format_map = {
-                                "audio/mpeg": "mp3",
-                                "audio/mp3": "mp3",
-                                "audio/wav": "wav",
-                                "audio/wave": "wav",
-                                "audio/x-wav": "wav"
-                            }
-                            audio_format = format_map.get(mime_type.lower(), "mp3")
-
+                        def _empty_audio_block() -> dict[str, Any]:
                             return {
                                 "type": "input_audio",
                                 "input_audio": {
-                                    "data": audio_payload,
-                                    "format": audio_format
-                                }
+                                    "data": "",
+                                    "format": "mp3",
+                                },
                             }
+
+                        def _normalize_base64(data: str) -> Optional[str]:
+                            if not data:
+                                return None
+                            cleaned = "".join(data.split())
+                            if not cleaned:
+                                return None
+                            if not self._validate_base64_size(cleaned):
+                                return None
+                            try:
+                                base64.b64decode(cleaned, validate=True)
+                            except (binascii.Error, ValueError):
+                                return None
+                            return cleaned
+
+                        def _resolved_mime_hint(payload: Optional[dict[str, Any]] = None) -> Optional[str]:
+                            candidates: list[Any] = []
+                            if isinstance(payload, dict):
+                                candidates.extend(
+                                    [
+                                        payload.get("mimeType"),
+                                        payload.get("mime_type"),
+                                    ]
+                                )
+                            candidates.extend(
+                                [
+                                    block.get("mimeType"),
+                                    block.get("mime_type"),
+                                    block.get("contentType"),
+                                    block.get("content_type"),
+                                ]
+                            )
+                            for value in candidates:
+                                if isinstance(value, str):
+                                    stripped = value.strip()
+                                    if stripped:
+                                        return stripped
+                            return None
+
+                        def _normalize_format(
+                            explicit_format: Optional[str],
+                            mime_hint: Optional[str],
+                        ) -> str:
+                            if isinstance(explicit_format, str):
+                                normalized = explicit_format.strip().lower()
+                                if normalized in supported_formats:
+                                    return normalized
+                            return _map_format(mime_hint)
+
+                        def _build_audio_block(data: str, audio_format: str) -> dict[str, Any]:
+                            return {
+                                "type": "input_audio",
+                                "input_audio": {
+                                    "data": data,
+                                    "format": audio_format,
+                                },
+                            }
+
+                        # If payload is already a dict with both data/format, validate and passthrough
+                        if isinstance(audio_payload, dict) and "data" in audio_payload and "format" in audio_payload:
+                            cleaned = _normalize_base64(audio_payload.get("data", ""))
+                            if not cleaned:
+                                self.logger.warning("Audio payload rejected: invalid base64 data.")
+                                await self._emit_error(
+                                    event_emitter,
+                                    "Audio input was not valid base64.",
+                                    show_error_message=False,
+                                )
+                                return _empty_audio_block()
+                            audio_format = _normalize_format(audio_payload.get("format"), _resolved_mime_hint(audio_payload))
+                            return _build_audio_block(cleaned, audio_format)
+
+                        # Payload dict without format but containing data (tool outputs)
+                        if isinstance(audio_payload, dict):
+                            raw_data = audio_payload.get("data")
+                            if isinstance(raw_data, str):
+                                cleaned = _normalize_base64(raw_data)
+                                if not cleaned:
+                                    self.logger.warning("Audio payload rejected: invalid base64 data.")
+                                    await self._emit_error(
+                                        event_emitter,
+                                        "Audio input was not valid base64.",
+                                        show_error_message=False,
+                                    )
+                                    return _empty_audio_block()
+                                mime_hint = _resolved_mime_hint(audio_payload)
+                                audio_format = _normalize_format(audio_payload.get("format"), mime_hint)
+                                return _build_audio_block(cleaned, audio_format)
+
+                        # Need to convert to Responses format for string payloads
+                        if isinstance(audio_payload, str):
+                            sanitized = audio_payload.strip()
+                            lowercase = sanitized.lower()
+                            if lowercase.startswith(("http://", "https://")):
+                                self.logger.warning("Audio payload rejected: remote URLs are not supported.")
+                                await self._emit_error(
+                                    event_emitter,
+                                    "Audio input must be base64-encoded. URLs are not supported.",
+                                    show_error_message=False,
+                                )
+                                return _empty_audio_block()
+
+                            # Handle data URLs
+                            if lowercase.startswith("data:"):
+                                parsed = self._parse_data_url(sanitized if sanitized.startswith("data:") else f"data:{sanitized.split(':', 1)[1]}")
+                                if not parsed or not parsed.get("mime_type", "").startswith("audio/"):
+                                    self.logger.warning("Audio payload rejected: invalid data URL.")
+                                    await self._emit_error(
+                                        event_emitter,
+                                        "Audio input must be base64-encoded audio data.",
+                                        show_error_message=False,
+                                    )
+                                    return _empty_audio_block()
+                                if not self._validate_base64_size(parsed.get("b64", "")):
+                                    return _empty_audio_block()
+                                audio_format = _map_format(parsed.get("mime_type"))
+                                return _build_audio_block(parsed.get("b64", ""), audio_format)
+
+                            cleaned = _normalize_base64(sanitized)
+                            if not cleaned:
+                                self.logger.warning("Audio payload rejected: invalid base64 data.")
+                                await self._emit_error(
+                                    event_emitter,
+                                    "Audio input was not valid base64.",
+                                    show_error_message=False,
+                                )
+                                return _empty_audio_block()
+
+                            mime_type = _resolved_mime_hint()
+                            audio_format = _map_format(mime_type)
+                            return _build_audio_block(cleaned, audio_format)
 
                         # Invalid/empty
                         self.logger.warning("Invalid audio payload format, returning empty audio block")
-                        return {
-                            "type": "input_audio",
-                            "input_audio": {
-                                "data": "",
-                                "format": "mp3"
-                            }
-                        }
+                        return _empty_audio_block()
 
                     except Exception as exc:
                         self.logger.error(f"Error in _to_input_audio: {exc}")
                         await self._emit_error(
                             event_emitter,
                             f"Audio processing error: {exc}",
-                            show_error_message=False
+                            show_error_message=False,
                         )
-                        return {
-                            "type": "input_audio",
-                            "input_audio": {
-                                "data": "",
-                                "format": "mp3"
-                            }
-                        }
+                        return _empty_audio_block()
 
                 async def _to_input_video(block: dict) -> dict:
                     """Convert Open WebUI video blocks into Chat Completions video format.
@@ -4914,6 +5028,7 @@ class Pipe:
             result = await self._process_transformed_request(
                 body,
                 __user__,
+                __request__,
                 __event_emitter__,
                 __event_call__,
                 __metadata__,
@@ -4939,6 +5054,7 @@ class Pipe:
         self,
         body: dict[str, Any],
         __user__: dict[str, Any],
+        __request__: Request,
         __event_emitter__: Callable[[dict[str, Any]], Awaitable[None]] | None,
         __event_call__: Callable[[dict[str, Any]], Awaitable[Any]] | None,
         __metadata__: dict[str, Any],

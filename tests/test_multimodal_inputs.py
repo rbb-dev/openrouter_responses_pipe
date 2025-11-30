@@ -68,6 +68,29 @@ def sample_audio_base64():
     return base64.b64encode(b"FAKE_AUDIO_DATA").decode("utf-8")
 
 
+async def _transform_single_block(
+    pipe_instance: Pipe,
+    block: dict,
+    mock_request,
+    mock_user,
+) -> dict:
+    """Helper to transform a single user message block."""
+    messages = [
+        {
+            "role": "user",
+            "content": [block],
+        }
+    ]
+    transformed = await ResponsesBody.transform_messages_to_input(
+        pipe_instance,
+        messages,
+        __request__=mock_request,
+        user_obj=mock_user,
+        event_emitter=None,
+    )
+    return transformed[0]["content"][0]
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Helper Method Tests
 # ─────────────────────────────────────────────────────────────────────────────
@@ -428,42 +451,174 @@ class TestFileTransformer:
 class TestAudioTransformer:
     """Tests for _to_input_audio transformer function."""
 
-    def test_audio_already_correct_format_passthrough(self):
-        """Should pass through audio already in Responses API format."""
-        # Input: {"type": "input_audio", "input_audio": {"data": "base64", "format": "wav"}}
-        pass
-
-    def test_audio_chat_completions_format_converted(self):
-        """Should convert Chat Completions audio format."""
-        # Input: {"type": "input_audio", "input_audio": "base64_string"}
-        # Output: {"type": "input_audio", "input_audio": {"data": "base64", "format": "mp3"}}
-        pass
-
-    def test_audio_tool_output_format_converted(self):
-        """Should convert Open WebUI tool audio output format."""
-        # Input: {"type": "audio", "mimeType": "audio/wav", "data": "base64"}
-        # Output: {"type": "input_audio", "input_audio": {"data": "base64", "format": "wav"}}
-        pass
-
-    def test_audio_mime_type_to_format_mapping(self):
-        """Should correctly map MIME types to audio formats."""
-        test_cases = {
-            "audio/mpeg": "mp3",
-            "audio/mp3": "mp3",
-            "audio/wav": "wav",
-            "audio/wave": "wav",
-            "audio/x-wav": "wav",
-            "audio/unknown": "mp3",  # Default
+    @pytest.mark.asyncio
+    async def test_audio_already_correct_format_passthrough(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        sample_audio_base64,
+    ):
+        """Should pass through audio already in Responses API format after validation."""
+        block = {
+            "type": "input_audio",
+            "input_audio": {"data": sample_audio_base64, "format": "wav"},
         }
-        pass
+        audio_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert audio_block["input_audio"]["data"] == sample_audio_base64
+        assert audio_block["input_audio"]["format"] == "wav"
 
-    def test_audio_invalid_payload_returns_empty_block(self):
-        """Should return empty audio block for invalid payload."""
-        pass
+    @pytest.mark.asyncio
+    async def test_audio_chat_completions_format_converted(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        sample_audio_base64,
+    ):
+        """Should convert Chat Completions-style audio payloads."""
+        block = {
+            "type": "input_audio",
+            "mime_type": "audio/wave",
+            "input_audio": sample_audio_base64,
+        }
+        audio_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert audio_block["type"] == "input_audio"
+        assert audio_block["input_audio"]["data"] == sample_audio_base64
+        assert audio_block["input_audio"]["format"] == "wav"
 
-    def test_audio_error_returns_minimal_block(self):
-        """Should return minimal valid block on error without crashing."""
-        pass
+    @pytest.mark.asyncio
+    async def test_audio_tool_output_format_converted(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        sample_audio_base64,
+    ):
+        """Should convert Open WebUI tool audio output format using mimeType."""
+        block = {
+            "type": "audio",
+            "mimeType": "audio/wav",
+            "data": sample_audio_base64,
+        }
+        audio_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert audio_block["input_audio"]["format"] == "wav"
+        assert audio_block["input_audio"]["data"] == sample_audio_base64
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "mime_type,expected_format",
+        [
+            ("audio/mpeg", "mp3"),
+            ("audio/mp3", "mp3"),
+            ("audio/wav", "wav"),
+            ("audio/wave", "wav"),
+            ("audio/x-wav", "wav"),
+            ("audio/unknown", "mp3"),
+            (None, "mp3"),
+        ],
+    )
+    async def test_audio_mime_type_to_format_mapping(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        sample_audio_base64,
+        mime_type,
+        expected_format,
+    ):
+        """Should correctly map MIME types to supported formats."""
+        block = {
+            "type": "audio",
+            "mimeType": mime_type,
+            "data": sample_audio_base64,
+        }
+        audio_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert audio_block["input_audio"]["format"] == expected_format
+
+    @pytest.mark.asyncio
+    async def test_audio_invalid_payload_returns_empty_block(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+    ):
+        """Should return empty audio block for malformed payloads."""
+        block = {"type": "input_audio", "input_audio": 12345}
+        audio_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert audio_block["input_audio"]["data"] == ""
+        assert audio_block["input_audio"]["format"] == "mp3"
+
+    @pytest.mark.asyncio
+    async def test_audio_error_returns_minimal_block(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        sample_audio_base64,
+        monkeypatch,
+    ):
+        """Should swallow exceptions and return minimal block."""
+        boom = RuntimeError("boom")
+        monkeypatch.setattr(pipe_instance, "_parse_data_url", Mock(side_effect=boom))
+        block = {
+            "type": "input_audio",
+            "input_audio": f"DATA:audio/mp3;base64,{sample_audio_base64}",
+        }
+        audio_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert audio_block["input_audio"]["data"] == ""
+        assert audio_block["input_audio"]["format"] == "mp3"
+
+    @pytest.mark.asyncio
+    async def test_audio_data_url_supported(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        sample_audio_base64,
+    ):
+        """Should parse and accept audio data URLs."""
+        block = {
+            "type": "input_audio",
+            "input_audio": f"data:audio/mp3;base64,{sample_audio_base64}",
+        }
+        audio_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert audio_block["input_audio"]["data"] == sample_audio_base64
+        assert audio_block["input_audio"]["format"] == "mp3"
+
+    @pytest.mark.asyncio
+    async def test_audio_rejects_remote_urls(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+    ):
+        """Should reject remote URLs to match OpenRouter requirements."""
+        block = {
+            "type": "input_audio",
+            "input_audio": "https://example.com/audio.mp3",
+        }
+        audio_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert audio_block["input_audio"]["data"] == ""
+        assert audio_block["input_audio"]["format"] == "mp3"
+
+    @pytest.mark.asyncio
+    async def test_audio_partial_dict_without_format(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        sample_audio_base64,
+    ):
+        """Should derive format for dict payloads missing explicit format."""
+        block = {
+            "type": "audio",
+            "mime_type": "audio/wav",
+            "data": sample_audio_base64,
+        }
+        audio_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert audio_block["input_audio"]["format"] == "wav"
+        assert audio_block["input_audio"]["data"] == sample_audio_base64
 
 
 # ─────────────────────────────────────────────────────────────────────────────

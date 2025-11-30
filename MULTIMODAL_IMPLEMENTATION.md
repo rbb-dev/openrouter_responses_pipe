@@ -175,12 +175,16 @@ Converts Open WebUI audio blocks into Responses API format.
 1. Chat Completions: `{"type": "input_audio", "input_audio": "<base64>"}`
 2. Tool output: `{"type": "audio", "mimeType": "audio/mp3", "data": "<base64>"}`
 3. Already correct: `{"type": "input_audio", "input_audio": {"data": "...", "format": "..."}}`
+4. Data URLs: `{"type": "input_audio", "input_audio": "data:audio/mp3;base64,..."}` (trimmed + parsed)
+5. Partial dict payloads: `{"type": "audio", "data": "<base64>"}` (format derived from MIME hints)
 
 **Processing flow**:
-1. Extract audio payload from block
-2. If already in Responses API format: Return as-is
-3. If string payload: Determine format from MIME type, wrap in Responses format
-4. If invalid: Return empty audio block with default format
+1. Extract audio payload from `input_audio`, `data`, or `blob` fields.
+2. If a dict with `data`/`format`, validate base64, normalize format (`mp3`/`wav` only), and return.
+3. If a dict without `format`, sanitize the base64 data and derive the format from MIME hints (`mimeType`, `mime_type`, `contentType`).
+4. If a string data URL, parse + validate the payload (case-insensitive `data:` prefix) and ensure the MIME type starts with `audio/`.
+5. If a plain string, ensure it is valid base64 (enforcing MB valves) before wrapping it in the Responses API structure.
+6. Reject `http://` / `https://` URLs or other malformed payloads with warnings + `_emit_error`, returning an empty audio block so the pipe never crashes.
 
 **Error handling**: All errors caught and logged with status emissions. Returns minimal valid block rather than crashing.
 
