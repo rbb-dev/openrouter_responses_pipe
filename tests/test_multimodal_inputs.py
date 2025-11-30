@@ -461,31 +461,96 @@ class TestStorageContext:
 class TestImageTransformer:
     """Tests for _to_input_image transformer function."""
 
-    def test_image_url_simple_string(self):
-        """Should handle simple string image URL."""
-        # This test validates the basic transformation structure
-        # Actual implementation requires async context, tested in integration
-        pass
+    @pytest.mark.asyncio
+    async def test_image_data_url_saved_to_storage(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        sample_image_base64,
+        monkeypatch,
+    ):
+        """Base64 images should be re-hosted and emit status updates."""
+        stored_url = "/api/v1/files/img123"
+        upload_mock = AsyncMock(return_value=stored_url)
+        status_mock = AsyncMock()
+        monkeypatch.setattr(pipe_instance, "_upload_to_owui_storage", upload_mock)
+        monkeypatch.setattr(pipe_instance, "_emit_status", status_mock)
 
-    def test_image_url_nested_dict(self):
-        """Should extract URL from nested dict structure."""
-        pass
+        block = {
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{sample_image_base64}", "detail": "high"},
+        }
+        image_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert image_block["image_url"] == stored_url
+        assert image_block["detail"] == "high"
+        upload_mock.assert_awaited()
+        status_mock.assert_awaited_with(
+            None,
+            StatusMessages.IMAGE_BASE64_SAVED,
+            done=False,
+        )
 
-    def test_image_data_url_saved_to_storage(self):
-        """Should save base64 image to OWUI storage."""
-        pass
+    @pytest.mark.asyncio
+    async def test_image_remote_url_downloaded_and_saved(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        monkeypatch,
+    ):
+        """Remote URLs are downloaded, uploaded, and statuses emitted."""
+        remote_url = "https://example.com/photo.png"
+        stored_url = "/api/v1/files/remote-img"
+        download_mock = AsyncMock(
+            return_value={"data": b"img", "mime_type": "image/png", "url": remote_url}
+        )
+        upload_mock = AsyncMock(return_value=stored_url)
+        status_mock = AsyncMock()
+        monkeypatch.setattr(pipe_instance, "_download_remote_url", download_mock)
+        monkeypatch.setattr(pipe_instance, "_upload_to_owui_storage", upload_mock)
+        monkeypatch.setattr(pipe_instance, "_emit_status", status_mock)
 
-    def test_image_remote_url_downloaded_and_saved(self):
-        """Should download remote image and save to storage."""
-        pass
+        block = {"type": "image_url", "image_url": {"url": remote_url, "detail": "auto"}}
+        image_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert image_block["image_url"] == stored_url
+        assert image_block["detail"] == "auto"
+        download_mock.assert_awaited_once_with(remote_url)
+        upload_mock.assert_awaited()
+        status_mock.assert_any_await(
+            None,
+            StatusMessages.IMAGE_REMOTE_SAVED,
+            done=False,
+        )
 
-    def test_image_detail_level_preserved(self):
-        """Should preserve detail level (auto/high/low)."""
-        pass
+    @pytest.mark.asyncio
+    async def test_image_detail_level_preserved(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+    ):
+        """Explicit detail selection should survive transformation."""
+        block = {"type": "image_url", "image_url": {"url": "/api/v1/files/abc", "detail": "low"}}
+        image_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert image_block["detail"] == "low"
+        assert image_block["image_url"] == "/api/v1/files/abc"
 
-    def test_image_error_returns_empty_block(self):
-        """Should return empty image block on error without crashing."""
-        pass
+    @pytest.mark.asyncio
+    async def test_image_error_returns_empty_block(
+        self,
+        pipe_instance,
+        mock_request,
+        mock_user,
+        monkeypatch,
+    ):
+        """Errors while processing images should not leak exceptions."""
+        boom = RuntimeError("boom")
+        monkeypatch.setattr(pipe_instance, "_upload_to_owui_storage", AsyncMock(side_effect=boom))
+        block = {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}}
+        image_block = await _transform_single_block(pipe_instance, block, mock_request, mock_user)
+        assert image_block["image_url"] == "data:image/png;base64,AAAA"
+        assert image_block["detail"] == "auto"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
