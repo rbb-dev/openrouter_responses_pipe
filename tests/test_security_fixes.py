@@ -17,7 +17,9 @@ pytest_plugins = ('pytest_asyncio',)
 class TestSSRFProtection:
     """Test SSRF (Server-Side Request Forgery) protection."""
 
-    def test_is_safe_url_public_ip(self):
+    pytestmark = pytest.mark.asyncio
+
+    async def test_is_safe_url_public_ip(self):
         """Test that public IPs are allowed."""
         from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
 
@@ -26,10 +28,10 @@ class TestSSRFProtection:
 
         # Mock DNS resolution to return a public IP
         with patch('socket.gethostbyname', return_value='8.8.8.8'):
-            assert pipe._is_safe_url("https://example.com/image.jpg") is True
-            assert pipe._is_safe_url("http://google.com/file.pdf") is True
+            assert await pipe._is_safe_url("https://example.com/image.jpg") is True
+            assert await pipe._is_safe_url("http://google.com/file.pdf") is True
 
-    def test_is_safe_url_localhost(self):
+    async def test_is_safe_url_localhost(self):
         """Test that localhost is blocked."""
         from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
 
@@ -37,39 +39,37 @@ class TestSSRFProtection:
         pipe.valves.ENABLE_SSRF_PROTECTION = True
 
         with patch('socket.gethostbyname', return_value='127.0.0.1'):
-            assert pipe._is_safe_url("http://localhost:6379/") is False
-            assert pipe._is_safe_url("http://127.0.0.1/admin") is False
+            assert await pipe._is_safe_url("http://localhost:6379/") is False
+            assert await pipe._is_safe_url("http://127.0.0.1/admin") is False
 
-    def test_is_safe_url_private_network(self):
+    async def test_is_safe_url_private_network(self):
         """Test that private IP ranges are blocked."""
         from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
 
-        # Test various private IP ranges
         private_ips = [
-            ('10.0.0.1', 'http://internal.local/'),       # 10.0.0.0/8
-            ('192.168.1.1', 'http://router.local/'),      # 192.168.0.0/16
-            ('172.16.0.1', 'http://server.local/'),       # 172.16.0.0/12
+            ('10.0.0.1', 'http://internal.local/'),
+            ('192.168.1.1', 'http://router.local/'),
+            ('172.16.0.1', 'http://server.local/'),
         ]
 
         for ip, url in private_ips:
             with patch('socket.gethostbyname', return_value=ip):
-                assert pipe._is_safe_url(url) is False, f"Should block private IP {ip}"
+                assert await pipe._is_safe_url(url) is False, f"Should block private IP {ip}"
 
-    def test_is_safe_url_link_local(self):
+    async def test_is_safe_url_link_local(self):
         """Test that link-local addresses are blocked (AWS metadata)."""
         from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
 
-        # AWS metadata service IP
         with patch('socket.gethostbyname', return_value='169.254.169.254'):
-            assert pipe._is_safe_url("http://169.254.169.254/latest/meta-data/") is False
+            assert await pipe._is_safe_url("http://169.254.169.254/latest/meta-data/") is False
 
-    def test_is_safe_url_multicast(self):
+    async def test_is_safe_url_multicast(self):
         """Test that multicast IPs are blocked."""
         from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
 
@@ -77,9 +77,9 @@ class TestSSRFProtection:
         pipe.valves.ENABLE_SSRF_PROTECTION = True
 
         with patch('socket.gethostbyname', return_value='224.0.0.1'):
-            assert pipe._is_safe_url("http://multicast.local/") is False
+            assert await pipe._is_safe_url("http://multicast.local/") is False
 
-    def test_is_safe_url_dns_failure(self):
+    async def test_is_safe_url_dns_failure(self):
         """Test that DNS resolution failures are treated as unsafe."""
         from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
 
@@ -87,28 +87,27 @@ class TestSSRFProtection:
         pipe.valves.ENABLE_SSRF_PROTECTION = True
 
         with patch('socket.gethostbyname', side_effect=socket.gaierror):
-            assert pipe._is_safe_url("http://nonexistent.invalid/") is False
+            assert await pipe._is_safe_url("http://nonexistent.invalid/") is False
 
-    def test_is_safe_url_disabled(self):
+    async def test_is_safe_url_disabled(self):
         """Test that SSRF protection can be disabled."""
         from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = False
 
-        # Should allow any URL when disabled
-        assert pipe._is_safe_url("http://127.0.0.1/") is True
-        assert pipe._is_safe_url("http://192.168.1.1/") is True
+        assert await pipe._is_safe_url("http://127.0.0.1/") is True
+        assert await pipe._is_safe_url("http://192.168.1.1/") is True
 
-    def test_is_safe_url_no_hostname(self):
+    async def test_is_safe_url_no_hostname(self):
         """Test that URLs without hostname are blocked."""
         from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
 
-        assert pipe._is_safe_url("file:///etc/passwd") is False
-        assert pipe._is_safe_url("data:text/plain,hello") is False
+        assert await pipe._is_safe_url("file:///etc/passwd") is False
+        assert await pipe._is_safe_url("data:text/plain,hello") is False
 
 
 class TestYouTubeURLValidation:
@@ -223,7 +222,7 @@ class TestRemoteURLDownloadSSRF:
         pipe.valves.ENABLE_SSRF_PROTECTION = True
 
         # Mock _is_safe_url to return False (private IP)
-        with patch.object(pipe, '_is_safe_url', return_value=False):
+        with patch.object(pipe, '_is_safe_url', AsyncMock(return_value=False)):
             # We can't test async method without proper async support
             # Test that SSRF protection is enabled on the valve
             assert pipe.valves.ENABLE_SSRF_PROTECTION is True
@@ -237,7 +236,7 @@ class TestRemoteURLDownloadSSRF:
         pipe.valves.REMOTE_DOWNLOAD_MAX_RETRIES = 0  # Disable retries for testing
 
         # Mock _is_safe_url to return True (public IP)
-        with patch.object(pipe, '_is_safe_url', return_value=True):
+        with patch.object(pipe, '_is_safe_url', AsyncMock(return_value=True)):
             # Test that SSRF protection is enabled
             assert pipe.valves.ENABLE_SSRF_PROTECTION is True
 
@@ -250,7 +249,7 @@ class TestRemoteURLDownloadSSRF:
 
         # Even with private IP, should not block if protection is disabled
         # We still mock to avoid actual network calls
-        with patch.object(pipe, '_is_safe_url', return_value=True) as mock_safe:
+        with patch.object(pipe, '_is_safe_url', AsyncMock(return_value=True)):
             # Test that SSRF protection can be disabled
             assert pipe.valves.ENABLE_SSRF_PROTECTION is False
 

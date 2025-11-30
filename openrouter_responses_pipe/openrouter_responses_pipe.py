@@ -1857,7 +1857,7 @@ class ResponsesBody(BaseModel):
                         # Validate remote URLs (SSRF protection)
                         elif url.startswith(("http://", "https://")) and not ("/api/v1/files/" in url or "/files/" in url):
                             # Apply SSRF protection for non-OWUI URLs
-                            if not self._is_safe_url(url):
+                            if not await self._is_safe_url(url):
                                 self.logger.error(f"SSRF protection blocked video URL: {url}")
                                 await self._emit_error(
                                     event_emitter,
@@ -4551,47 +4551,14 @@ class Pipe:
             self._storage_user_cache = fallback_user
             return fallback_user
 
-    def _is_safe_url(self, url: str) -> bool:
-        """Validate URL is not targeting internal/private networks (SSRF protection).
-
-        This method protects against Server-Side Request Forgery (SSRF) attacks by
-        preventing requests to private IP ranges, localhost, and link-local addresses.
-
-        Protected IP Ranges:
-            - Loopback: 127.0.0.0/8 (localhost)
-            - Private networks: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
-            - Link-local: 169.254.0.0/16 (APIPA, AWS metadata)
-            - Multicast: 224.0.0.0/4
-            - Reserved: 240.0.0.0/4
-
-        Args:
-            url: The URL to validate (http:// or https:// only)
-
-        Returns:
-            True if URL is safe to access (public internet),
-            False if URL targets private/internal networks
-
-        Attack Scenarios Prevented:
-            - http://localhost:6379/ → Redis probing
-            - http://169.254.169.254/latest/meta-data/ → AWS metadata leak
-            - http://192.168.1.1/admin → Internal network scanning
-            - http://10.0.0.5:8080/api → Private service access
-
-        Note:
-            - Can be disabled via ENABLE_SSRF_PROTECTION valve (default: True)
-            - DNS resolution failures are treated as unsafe
-            - All resolved IPv4/IPv6 addresses must be public (any private hit blocks the request)
-
-        Example:
-            >>> self._is_safe_url("https://example.com/image.jpg")
-            True
-            >>> self._is_safe_url("http://127.0.0.1/")
-            False
-        """
-        # Check if SSRF protection is enabled
+    async def _is_safe_url(self, url: str) -> bool:
+        """Async wrapper to validate URLs without blocking the event loop."""
         if not self.valves.ENABLE_SSRF_PROTECTION:
             return True
+        return await asyncio.to_thread(self._is_safe_url_blocking, url)
 
+    def _is_safe_url_blocking(self, url: str) -> bool:
+        """Blocking implementation of the SSRF guard (runs in a thread)."""
         try:
             import ipaddress
             import socket
@@ -4778,7 +4745,7 @@ class Pipe:
             return None
 
         # SSRF protection: Validate URL is not targeting private networks
-        if not self._is_safe_url(url):
+        if not await self._is_safe_url(url):
             self.logger.error(f"SSRF protection blocked download from: {url}")
             return None
 
