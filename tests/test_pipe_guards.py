@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import types
 
 from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
 
@@ -102,5 +103,41 @@ def test_merge_valves_honors_reasoning_retention_alias():
         user_valves = pipe.UserValves.model_validate({"next_reply": "conversation"})
         merged = pipe._merge_valves(pipe.Valves(), user_valves)
         assert merged.PERSIST_REASONING_TOKENS == "conversation"
+    finally:
+        pipe.shutdown()
+
+
+def test_redis_candidate_requires_full_multiworker_env(monkeypatch, caplog):
+    monkeypatch.setenv("UVICORN_WORKERS", "4")
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    monkeypatch.setenv("WEBSOCKET_MANAGER", "")
+    monkeypatch.delenv("WEBSOCKET_REDIS_URL", raising=False)
+
+    with caplog.at_level(logging.WARNING):
+        pipe = Pipe()
+
+    try:
+        assert pipe._redis_candidate is False
+        assert any("REDIS_URL is unset" in message for message in caplog.messages)
+    finally:
+        pipe.shutdown()
+
+
+def test_redis_candidate_enabled_with_complete_env(monkeypatch):
+    dummy_aioredis = types.SimpleNamespace(from_url=lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "openrouter_responses_pipe.openrouter_responses_pipe.aioredis",
+        dummy_aioredis,
+        raising=False,
+    )
+
+    monkeypatch.setenv("UVICORN_WORKERS", "3")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    monkeypatch.setenv("WEBSOCKET_MANAGER", "redis")
+    monkeypatch.setenv("WEBSOCKET_REDIS_URL", "redis://localhost:6380/0")
+
+    pipe = Pipe()
+    try:
+        assert pipe._redis_candidate is True
     finally:
         pipe.shutdown()
