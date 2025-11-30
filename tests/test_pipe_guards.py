@@ -72,3 +72,35 @@ def test_pipe_handles_job_failure(monkeypatch):
         await pipe.close()
 
     asyncio.run(runner())
+
+
+def test_merge_valves_no_overrides_returns_global():
+    pipe = Pipe()
+    try:
+        baseline = pipe.Valves()
+        merged = pipe._merge_valves(baseline, pipe.UserValves())
+        assert merged is baseline
+    finally:
+        pipe.shutdown()
+
+
+def test_merge_valves_applies_user_boolean_override():
+    pipe = Pipe()
+    try:
+        user_valves = pipe.UserValves.model_validate({"ENABLE_REASONING": False})
+        baseline = pipe.Valves()
+        merged = pipe._merge_valves(baseline, user_valves)
+        assert merged.ENABLE_REASONING is False
+        assert merged.LOG_LEVEL == baseline.LOG_LEVEL
+    finally:
+        pipe.shutdown()
+
+
+def test_merge_valves_honors_reasoning_retention_alias():
+    pipe = Pipe()
+    try:
+        user_valves = pipe.UserValves.model_validate({"next_reply": "conversation"})
+        merged = pipe._merge_valves(pipe.Valves(), user_valves)
+        assert merged.PERSIST_REASONING_TOKENS == "conversation"
+    finally:
+        pipe.shutdown()

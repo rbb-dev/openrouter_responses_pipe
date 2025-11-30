@@ -112,7 +112,7 @@ Per-user valves allow overrides on top of the global defaults. Any field set to 
 | `ENABLE_REASONING` (bool) | `True` | n/a | Users can disable reasoning traces for their own chats even when the workspace keeps it enabled. |
 | `REASONING_EFFORT` (Literal) | `"medium"` | `"minimal"`…`"high"` | Personal preference for how “hard” the model should think when reasoning-capable. |
 | `REASONING_SUMMARY_MODE` (Literal) | `"auto"` | `"auto" / "concise" / "detailed" / "disabled"` | Lets an individual pick how verbose the reasoning summaries should be. |
-| `next_reply` (Literal) | `"next_reply"` | `"disabled" / "next_reply" / "conversation"` | Per-user reasoning retention horizon (name mirrors the underlying context value). |
+| `PERSIST_REASONING_TOKENS` (Literal, alias `"next_reply"`) | `"next_reply"` | `"disabled" / "next_reply" / "conversation"` | Per-user reasoning retention horizon. Alias retained for compatibility with the UI schema. |
 | `PERSIST_TOOL_RESULTS` (bool) | `True` | n/a | Opt out of persisting tool outputs for a specific user’s chats. |
 | `STREAMING_UPDATE_PROFILE` (Literal) | `"normal"` | `"quick" / "normal" / "slow"` | Personal streaming preset to trade latency vs. stability. |
 | `STREAMING_UPDATE_CHAR_LIMIT` (int) | 20 | 10 / 500 | Per-user throttle on streaming batch size. |

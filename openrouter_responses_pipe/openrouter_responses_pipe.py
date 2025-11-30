@@ -70,7 +70,7 @@ import email.utils
 import aiohttp
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 from pydantic_core import core_schema
 from pydantic import GetCoreSchemaHandler
 from cryptography.fernet import Fernet, InvalidToken
@@ -2549,6 +2549,8 @@ class Pipe:
 
     class UserValves(BaseModel):
         """Per-user valve overrides."""
+
+        model_config = ConfigDict(populate_by_name=True)
         @model_validator(mode="before")
         @classmethod
         def _normalize_inherit(cls, values):
@@ -2589,8 +2591,11 @@ class Pipe:
             title="Reasoning summary",
             description="Override how reasoning summaries are requested (auto/concise/detailed/disabled). Set to Inherit to reuse the workspace default.",
         )
-        next_reply: Literal["disabled", "next_reply", "conversation"] = Field(
+        PERSIST_REASONING_TOKENS: Literal["disabled", "next_reply", "conversation"] = Field(
             default="next_reply",
+            validation_alias=AliasChoices("PERSIST_REASONING_TOKENS", "next_reply"),
+            serialization_alias="next_reply",
+            alias="next_reply",
             title="Reasoning retention",
             description="Reasoning retention preference (Off, Only for the next reply, or Entire conversation). Set to Inherit to reuse the workspace default.",
         )
@@ -7182,13 +7187,40 @@ class Pipe:
         if not user_valves:
             return global_valves
 
-        # Merge: update only fields not set to "INHERIT"
-        update = {
-            k: v
-            for k, v in user_valves.model_dump().items()
-            if v is not None and str(v).lower() != "inherit"
-        }
-        return global_valves.model_copy(update=update)
+        overrides: dict[str, Any] = {}
+        if isinstance(user_valves, BaseModel):
+            fields_set = getattr(user_valves, "model_fields_set", set()) or set()
+            for field_name in fields_set:
+                value = getattr(user_valves, field_name, None)
+                if value is None:
+                    continue
+                overrides[field_name] = value
+        elif isinstance(user_valves, dict):
+            overrides = {
+                key: value
+                for key, value in user_valves.items()
+                if value is not None and str(value).lower() != "inherit"
+            }
+
+        if not overrides:
+            return global_valves
+
+        mapped: dict[str, Any] = {}
+        for key, value in overrides.items():
+            target_key = key
+            if not hasattr(global_valves, target_key):
+                if key == "next_reply":
+                    target_key = "PERSIST_REASONING_TOKENS"
+                elif key == "PERSIST_REASONING_TOKENS" and not hasattr(global_valves, key):
+                    continue
+                elif not hasattr(global_valves, target_key):
+                    continue
+            mapped[target_key] = value
+
+        if not mapped:
+            return global_valves
+
+        return global_valves.model_copy(update=mapped)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. Utility & Helper Layer (organized, consistent docstrings)
