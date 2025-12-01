@@ -1160,11 +1160,30 @@ class ResponsesBody(BaseModel):
 
         logger = LOGGER
         active_valves = valves or self.valves
-        image_limit = max(0, int(getattr(active_valves, "MAX_INPUT_IMAGES_PER_REQUEST", 5) or 0))
-        selection_mode = getattr(active_valves, "IMAGE_INPUT_SELECTION", "user_then_assistant") or "user_then_assistant"
-        chunk_size = int(getattr(active_valves, "IMAGE_UPLOAD_CHUNK_BYTES", 1 * 1024 * 1024) or (1 * 1024 * 1024))
-        chunk_size = max(64 * 1024, chunk_size)
-        max_inline_bytes = max(1, int(getattr(active_valves, "BASE64_MAX_SIZE_MB", self.valves.BASE64_MAX_SIZE_MB)) * 1024 * 1024)
+        image_limit = getattr(
+            active_valves,
+            "MAX_INPUT_IMAGES_PER_REQUEST",
+            self.valves.MAX_INPUT_IMAGES_PER_REQUEST,
+        )
+        selection_mode = getattr(
+            active_valves,
+            "IMAGE_INPUT_SELECTION",
+            self.valves.IMAGE_INPUT_SELECTION,
+        )
+        chunk_size = getattr(
+            active_valves,
+            "IMAGE_UPLOAD_CHUNK_BYTES",
+            self.valves.IMAGE_UPLOAD_CHUNK_BYTES,
+        )
+        max_inline_bytes = (
+            getattr(
+                active_valves,
+                "BASE64_MAX_SIZE_MB",
+                self.valves.BASE64_MAX_SIZE_MB,
+            )
+            * 1024
+            * 1024
+        )
         target_model_id = model_id or openwebui_model_id or ""
         if target_model_id:
             vision_supported = ModelFamily.supports("vision", target_model_id)
@@ -2874,7 +2893,7 @@ class Pipe:
         decrypted_encryption_key = EncryptedStr.decrypt(self.valves.ARTIFACT_ENCRYPTION_KEY)
         self._encryption_key: str = (decrypted_encryption_key or "").strip()
         self._encrypt_all: bool = bool(self.valves.ENCRYPT_ALL)
-        self._compression_min_bytes: int = max(0, int(self.valves.MIN_COMPRESS_BYTES or 0))
+        self._compression_min_bytes: int = self.valves.MIN_COMPRESS_BYTES
         self._compression_enabled: bool = bool(
             self.valves.ENABLE_LZ4_COMPRESSION and lz4frame is not None
         )
@@ -2940,7 +2959,7 @@ class Pipe:
         self._redis_pending_key = f"{self._redis_namespace}:pending"
         self._redis_cache_prefix = f"{self._redis_namespace}:artifact"
         self._redis_flush_lock_key = f"{self._redis_namespace}:flush_lock"
-        self._redis_ttl = max(60, int(self.valves.REDIS_CACHE_TTL_SECONDS or 300))
+        self._redis_ttl = self.valves.REDIS_CACHE_TTL_SECONDS
         self._cleanup_task = None
         self._legacy_tool_warning_emitted = False
         self._storage_user_cache: Optional[Any] = None
@@ -3132,8 +3151,8 @@ class Pipe:
         consecutive_failures = 0
 
         while self._redis_enabled:
-            warn_threshold = max(1, int(self.valves.REDIS_PENDING_WARN_THRESHOLD or 1))
-            failure_limit = max(1, int(self.valves.REDIS_FLUSH_FAILURE_LIMIT or 1))
+            warn_threshold = self.valves.REDIS_PENDING_WARN_THRESHOLD
+            failure_limit = self.valves.REDIS_FLUSH_FAILURE_LIMIT
             try:
                 if not self._redis_client:
                     break
@@ -3180,7 +3199,7 @@ class Pipe:
 
             rows: list[dict[str, Any]] = []
             raw_entries: list[str] = []
-            batch_size = max(5, min(int(self.valves.DB_BATCH_SIZE or 10), 20))
+            batch_size = self.valves.DB_BATCH_SIZE
             while len(rows) < batch_size:
                 data = await self._redis_client.lpop(self._redis_pending_key)
                 if data is None:
@@ -3316,7 +3335,7 @@ class Pipe:
                 break
             except Exception as exc:
                 self.logger.warning("Artifact cleanup failed: %s", exc)
-            interval_hours = max(0.5, float(self.valves.ARTIFACT_CLEANUP_INTERVAL_HOURS or 1.0))
+            interval_hours = self.valves.ARTIFACT_CLEANUP_INTERVAL_HOURS
             interval_seconds = interval_hours * 3600
             jitter = min(600.0, interval_seconds * 0.25)
             await asyncio.sleep(interval_seconds + random.uniform(0, jitter))  # Fix: configurable cadence
@@ -3324,7 +3343,7 @@ class Pipe:
     async def _run_cleanup_once(self) -> None:
         if not (self._item_model and self._session_factory):
             return
-        cutoff_days = max(1, int(self.valves.ARTIFACT_CLEANUP_DAYS or 30))
+        cutoff_days = self.valves.ARTIFACT_CLEANUP_DAYS
         cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=cutoff_days)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
@@ -3370,7 +3389,7 @@ class Pipe:
                 )
                 self.logger.debug("Started request queue worker")
 
-            target = max(1, valves.MAX_CONCURRENT_REQUESTS)
+            target = valves.MAX_CONCURRENT_REQUESTS
             if cls._global_semaphore is None:
                 cls._global_semaphore = asyncio.Semaphore(target)
                 cls._semaphore_limit = target
@@ -3384,7 +3403,7 @@ class Pipe:
             elif target < cls._semaphore_limit:
                 self.logger.warning("Lower MAX_CONCURRENT_REQUESTS (%s→%s) requires restart to take full effect.", cls._semaphore_limit, target)
 
-            target_tool = max(1, valves.MAX_PARALLEL_TOOLS_GLOBAL)
+            target_tool = valves.MAX_PARALLEL_TOOLS_GLOBAL
             if cls._tool_global_semaphore is None:
                 cls._tool_global_semaphore = asyncio.Semaphore(target_tool)
                 cls._tool_global_limit = target_tool
@@ -3506,7 +3525,7 @@ class Pipe:
     async def _tool_worker_loop(self, context: _ToolExecutionContext) -> None:
         """Process queued tool calls with batching/timeouts."""
         pending: list[tuple[_QueuedToolCall | None, bool]] = []
-        batch_cap = max(1, int(context.batch_cap))
+        batch_cap = context.batch_cap
         idle_timeout = context.idle_timeout
         try:
             while True:
@@ -3679,7 +3698,7 @@ class Pipe:
         tool_type: str,
     ) -> tuple[str, str]:
         fn = item.tool_cfg.get("callable")
-        timeout = max(1, int(context.timeout))
+        timeout = float(context.timeout)
         retryer = AsyncRetrying(
             stop=stop_after_attempt(2),
             wait=wait_exponential(multiplier=0.2, min=0.2, max=1),
@@ -3731,15 +3750,11 @@ class Pipe:
                 session = self._create_http_session(job.valves)
                 tokens = self._apply_logging_context(job)
                 tool_queue: asyncio.Queue[_QueuedToolCall | None] = asyncio.Queue(maxsize=50)
-                per_request_tool_sem = asyncio.Semaphore(
-                    max(1, job.valves.MAX_PARALLEL_TOOLS_PER_REQUEST)
-                )
-                per_tool_timeout = max(1, int(job.valves.TOOL_TIMEOUT_SECONDS or 1))
-                batch_timeout = float(
-                    max(per_tool_timeout, int(job.valves.TOOL_BATCH_TIMEOUT_SECONDS or per_tool_timeout))
-                )
+                per_request_tool_sem = asyncio.Semaphore(job.valves.MAX_PARALLEL_TOOLS_PER_REQUEST)
+                per_tool_timeout = float(job.valves.TOOL_TIMEOUT_SECONDS)
+                batch_timeout = float(max(per_tool_timeout, job.valves.TOOL_BATCH_TIMEOUT_SECONDS))
                 idle_timeout_value = job.valves.TOOL_IDLE_TIMEOUT_SECONDS
-                idle_timeout = float(max(1, int(idle_timeout_value))) if idle_timeout_value else None
+                idle_timeout = float(idle_timeout_value) if idle_timeout_value else None
                 self.logger.debug("Tool timeouts (request=%s): per_call=%ss batch=%ss idle=%s", job.request_id, per_tool_timeout, batch_timeout, idle_timeout if idle_timeout is not None else "disabled")
                 tool_context = _ToolExecutionContext(
                     queue=tool_queue,
@@ -3750,9 +3765,9 @@ class Pipe:
                     idle_timeout=idle_timeout,
                     user_id=job.user_id,
                     event_emitter=job.event_emitter,
-                    batch_cap=max(1, int(job.valves.TOOL_BATCH_CAP or 1)),
+                    batch_cap=job.valves.TOOL_BATCH_CAP,
                 )
-                worker_count = max(1, job.valves.MAX_PARALLEL_TOOLS_PER_REQUEST)
+                worker_count = job.valves.MAX_PARALLEL_TOOLS_PER_REQUEST
                 for worker_idx in range(worker_count):
                     tool_context.workers.append(
                         asyncio.create_task(
@@ -3802,16 +3817,10 @@ class Pipe:
             keepalive_timeout=75,
             ttl_dns_cache=300,
         )
-        connect_timeout = max(1, int(getattr(valves, "HTTP_CONNECT_TIMEOUT_SECONDS", 10) or 10))
-        total_timeout_value = getattr(valves, "HTTP_TOTAL_TIMEOUT_SECONDS", None)
-        total_timeout = None
-        if isinstance(total_timeout_value, (int, float)):
-            if total_timeout_value > 0:
-                total_timeout = float(total_timeout_value)
-        sock_read = None
-        sock_read_value = getattr(valves, "HTTP_SOCK_READ_SECONDS", None)
-        if total_timeout is None and sock_read_value:
-            sock_read = float(max(1, int(sock_read_value)))
+        connect_timeout = float(valves.HTTP_CONNECT_TIMEOUT_SECONDS)
+        total_timeout_value = valves.HTTP_TOTAL_TIMEOUT_SECONDS
+        total_timeout = float(total_timeout_value) if total_timeout_value else None
+        sock_read = float(valves.HTTP_SOCK_READ_SECONDS) if total_timeout is None else None
         timeout = aiohttp.ClientTimeout(total=total_timeout, connect=connect_timeout, sock_read=sock_read)
         self.logger.debug("HTTP timeouts: connect=%ss total=%s sock_read=%s", connect_timeout, total_timeout if total_timeout is not None else "disabled", sock_read if sock_read is not None else "disabled")
         return aiohttp.ClientSession(
@@ -3931,7 +3940,7 @@ class Pipe:
         encryption_key = (decrypted_encryption_key or "").strip()
         self._encryption_key = encryption_key
         self._encrypt_all = bool(valves.ENCRYPT_ALL)
-        self._compression_min_bytes = max(0, int(valves.MIN_COMPRESS_BYTES or 0))
+        self._compression_min_bytes = valves.MIN_COMPRESS_BYTES
 
         wants_compression = bool(valves.ENABLE_LZ4_COMPRESSION)
         compression_enabled = wants_compression and lz4frame is not None
@@ -4332,7 +4341,7 @@ class Pipe:
                 if row.get("_persisted") and isinstance(row.get("id"), str)
             ]
             ulids = [ulid for ulid in ulids if ulid]
-            batch_size = max(5, min(int(self.valves.DB_BATCH_SIZE or 10), 20))  # Fix: configurable batching
+            batch_size = self.valves.DB_BATCH_SIZE  # Fix: configurable batching
             pending_rows = [row for row in rows if not row.get("_persisted")]
             if not pending_rows:
                 if ulids:
@@ -5236,7 +5245,7 @@ class Pipe:
 
     def _get_effective_remote_file_limit_mb(self) -> int:
         """Return the active remote download limit, honoring RAG constraints."""
-        base_limit_mb = int(self.valves.REMOTE_FILE_MAX_SIZE_MB)
+        base_limit_mb = self.valves.REMOTE_FILE_MAX_SIZE_MB
         rag_enabled, rag_limit_mb = _read_rag_file_constraints()
         if not rag_enabled or rag_limit_mb is None:
             return base_limit_mb
