@@ -67,3 +67,22 @@ async def test_from_completions_preserves_parallel_tool_calls(monkeypatch, minim
         transformer_context=minimal_pipe,
     )
     assert responses.parallel_tool_calls is False
+
+
+def test_auto_context_trimming_enabled_by_default(minimal_pipe):
+    responses = ResponsesBody(model="test", input=_STUBBED_INPUT)
+    minimal_pipe._apply_context_transforms(responses, minimal_pipe.valves)
+    assert responses.transforms == ["middle-out"]
+
+
+def test_auto_context_trimming_respects_explicit_transforms(minimal_pipe):
+    responses = ResponsesBody(model="test", input=_STUBBED_INPUT, transforms=["custom"])
+    minimal_pipe._apply_context_transforms(responses, minimal_pipe.valves)
+    assert responses.transforms == ["custom"]
+
+
+def test_auto_context_trimming_disabled_via_valve(minimal_pipe):
+    responses = ResponsesBody(model="test", input=_STUBBED_INPUT)
+    valves = minimal_pipe.valves.model_copy(update={"AUTO_CONTEXT_TRIMMING": False})
+    minimal_pipe._apply_context_transforms(responses, valves)
+    assert responses.transforms is None

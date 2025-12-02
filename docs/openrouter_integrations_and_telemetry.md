@@ -1,0 +1,130 @@
+# openrouter-specific integrations & telemetry
+
+**file:** `docs/openrouter_integrations_and_telemetry.md`
+**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py`
+
+This note collects the features that are unique to the OpenRouter variant of the Responses manifold. Use it whenever you need a quick reminder of the “extras” we ship for OpenRouter beyond the baseline OpenAI manifold.
+
+---
+
+## 1. status telemetry & usage string
+
+* Location: `openrouter_responses_pipe/openrouter_responses_pipe.py` inside `_emit_completion`.
+* When a request finishes, we emit a status message like:
+  ```text
+  Time: 80.31s  4007.6 tps | Cost $1.163295 | Total tokens: 323103 (Input: 1274, Output: 321829, Reasoning: 315177)
+  ```
+* The string is tailored to OpenRouter’s billing model:
+  * Pulls cost from the Responses API usage payload (USD with six decimals).
+  * Includes throughput (`tokens / elapsed_seconds`).
+  * Breaks out reasoning tokens explicitly because OpenRouter exposes them per request.
+* Controlled by valves:
+  * `SHOW_FINAL_USAGE_STATUS` (system + user) toggles the entire final status block.
+  * `STREAMING_UPDATE_PROFILE` and related valves influence how quickly interim token counts appear.
+
+---
+
+## 2. catalog-smart routing against /models
+
+* The pipe imports the entire `/models` payload (not just names) via `OpenRouterModelRegistry` and derives rich metadata:
+  * `supported_parameters` (parallel tool calls, reasoning, response_format, etc.).
+  * Capability flags for `vision`, `audio_input`, `video_input`, `web_search_tool`, etc.
+  * Provider-reported `max_completion_tokens` so we can honor provider caps via `USE_MODEL_MAX_OUTPUT_TOKENS`.
+* `ModelFamily.supports("feature", model_id)` is used throughout the pipe to enable/disable behaviors automatically (no separate allowlists).
+* Valve hook: `MODEL_ID=auto` imports the entire OpenRouter catalog, or you can specify a comma-separated shortlist.
+
+---
+
+## 3. automatic plugin + MCP wiring
+
+* When `ENABLE_WEB_SEARCH_TOOL=True` and the selected model advertises the paid `web_search` capability, the pipe automatically attaches OpenRouter’s `web` plugin. Users get web search without remembering to toggle anything in the UI.
+* `REMOTE_MCP_SERVERS_JSON` lets admins define workspace-wide MCP servers in valve JSON; the pipe merges those definitions with registry tools and OpenRouter-provided tools so they all appear in the same Responses request.
+* Strict tool schemas: when `ENABLE_STRICT_TOOL_CALLING=True`, OpenRouter tools are sent with `strict: true` + JSON Schema pruning so function calling behaves predictably across OpenRouter providers.
+
+---
+
+## 4. OpenRouter-friendly concurrency & retries
+
+* `_RetryableHTTPStatusError` + Tenacity waiters honor OpenRouter’s `Retry-After` headers, so we do not hammer `/responses` after throttling.
+* Admission control is tuned for OpenRouter’s concurrency envelope: `MAX_CONCURRENT_REQUESTS`, `_QUEUE_MAXSIZE`, and per-user breakers prioritize fast failure (HTTP 503) instead of allowing overloads.
+* `_stream_responses` merges usage blocks across multi-step tool loops, matching OpenRouter’s nested usage payload format.
+
+---
+
+## 5. status CSS patch for Open WebUI
+
+* Valve: `ENABLE_STATUS_CSS_PATCH` (default True).
+* On every request, `_process_transformed_request` injects a CSS snippet via `__event_call__` so multi-line status descriptions (like the final usage string above) are fully visible in Open WebUI’s sidebar. This mirrors the OpenAI manifold but we keep it optional.
+
+---
+
+## 6. persistence tuned for OpenRouter artifacts
+
+* Reasoning payloads are much larger on OpenRouter (hundreds of thousands of tokens), so we:
+  * Default to encrypting reasoning items (`ENCRYPT_ALL` optional for everything else).
+  * Use LZ4 compression whenever available to keep DB/Redis traffic sane.
+  * Prune tool outputs via `_prune_tool_output` once they fall outside `TOOL_OUTPUT_RETENTION_TURNS`.
+* Redis write-behind is namespaced to the pipe ID (which includes “openrouter” by default) so multi-tenant OpenRouter deployments can run multiple copies of the pipe safely.
+
+---
+
+## 7. multimodal guardrails aligned with OpenRouter limits
+
+* Remote download + base64 size caps default to `50 MB`, matching OpenRouter’s documentation for image/file attachments.
+* `_download_remote_url` enforces SSRF bans and honors OpenRouter’s expected MIME types (`image/png`, `image/jpeg`, `image/webp`, `image/gif`).
+* Valve `MAX_INPUT_IMAGES_PER_REQUEST` is clamped to `<=20`, matching OpenRouter’s current limit on `input_image` blocks.
+
+---
+
+## 8. developer-friendly valve catalog
+
+* The valve names mirror OpenRouter semantics (e.g., `REASONING_EFFORT`, `REASONING_SUMMARY_MODE`, `WEB_SEARCH_MAX_RESULTS`).
+* Each valve defaults to the OpenRouter-recommended value (reasoning enabled, web search enabled, Redis cache auto-on for multi-worker deployments).
+* See `docs/valves_and_configuration_atlas.md` for the full table, but this document highlights the ones that make the OpenRouter experience richer out of the box.
+
+---
+
+## 9. user-facing 400 error templates
+
+* Valve: `OPENROUTER_ERROR_TEMPLATE`.
+* When OpenRouter returns a 400 (prompt too long, moderation block, provider invalid request, etc.) the manifold surfaces a Markdown card instead of crashing the stream. The template is completely admin-configurable and supports placeholders for every data point we capture: model ids (`{model_identifier}`, `{requested_model}`, `{api_model_id}`, `{normalized_model_id}`), provider info (`{provider}`, `{upstream_type}`), request metadata (`{reason}`, `{request_id}`, `{request_id_reference}`), moderation sections, flagged excerpts, raw provider bodies, and derived metrics such as `{context_window_tokens}` / `{max_output_tokens}`.
+* Template hygiene: if a line references placeholders that are empty, the entire line is dropped automatically. That keeps the rendered card clean even when OpenRouter omits a field, and it lets admins reorder or remove sections without touching code.
+* Recommended workflow:
+  1. Copy the default template from `Pipe.Valves.OPENROUTER_ERROR_TEMPLATE`.
+  2. Add or remove Markdown sections as needed for your organization (e.g., internal ticket instructions, support URLs).
+  3. Keep `{request_id_reference}` somewhere in the template so operators can correlate user reports with OpenRouter telemetry.
+
+---
+
+## 10. auto context trimming (message transforms)
+
+* Valve: `AUTO_CONTEXT_TRIMMING` (default True). When enabled, `_apply_context_transforms` automatically sets `ResponsesBody.transforms = ["middle-out"]` unless the caller already provided a `transforms` list.
+* Why: OpenRouter’s [message transforms guide](https://github.com/openrouter-team/openrouter-docs/blob/main/manual/docs/guides/features/message-transforms.md) recommends applying `middle-out` to large prompts so requests degrade gracefully instead of failing with 400 “prompt too long”.
+* How to override:
+  * Set the valve to `False` if you want full manual control per request (e.g., you supply `transforms` yourself or use a custom trimming strategy).
+  * Provide `transforms` inside the request body to bypass the auto-injected array for a single call.
+
+### Example error template
+
+```markdown
+### 🚫 {heading} could not finish this request
+
+**Reason:** `{sanitized_detail}`
+
+- **Requested model:** `{requested_model}`
+- **Provider:** `{provider}`
+- **OpenRouter code:** `{openrouter_code}`
+- **Provider error type:** `{upstream_type}`
+- **Request ID:** `{request_id}`
+
+{moderation_reasons_section}
+{flagged_excerpt_section}
+
+{model_limits_section}
+
+{raw_body_section}
+
+Need help? Paste `{request_id}` into the on-call chat so we can pull traces.
+```
+
+Because each placeholder is optional, empty sections disappear automatically—e.g., if there are no moderation hits, the `{moderation_reasons_section}` line is removed before the card is sent to the user.
