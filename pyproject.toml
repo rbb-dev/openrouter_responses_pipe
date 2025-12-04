@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openrouter-responses-pipe"
+version = "1.0.5"
+description = "OpenRouter Responses API pipe for Open WebUI"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {file = "LICENSE"}
+authors = [
+  {name = "rbb-dev"}
+]
+maintainers = [
+  {name = "rbb-dev"}
+]
+dependencies = [
+  "aiohttp",
+  "cryptography",
+  "fastapi",
+  "httpx",
+  "lz4",
+  "pydantic",
+  "pydantic-core",
+  "sqlalchemy",
+  "tenacity"
+]
+
+[project.urls]
+Homepage = "https://github.com/rbb-dev"
+Repository = "https://github.com/rbb-dev/openrouter_responses_pipe/"
+
+[tool.setuptools.packages.find]
+include = ["openrouter_responses_pipe"]
