@@ -184,6 +184,7 @@ def _render_error_template(template: str, values: dict[str, Any]) -> str:
     condition_stack: list[bool] = []
 
     def _conditions_active() -> bool:
+        """Return True when the current {{#if}} stack has no falsy guards."""
         return all(condition_stack) if condition_stack else True
 
     for raw_line in template.splitlines():
@@ -272,6 +273,7 @@ class _RetryableHTTPStatusError(Exception):
     """Wrapper that marks an HTTPStatusError as retryable."""
 
     def __init__(self, original: httpx.HTTPStatusError, retry_after: Optional[float] = None):
+        """Capture the original HTTP error plus optional Retry-After hint."""
         self.original = original
         self.retry_after = retry_after
         status_code = getattr(original.response, "status_code", "unknown")
@@ -282,9 +284,11 @@ class _RetryWait:
     """Custom Tenacity wait strategy honoring Retry-After headers."""
 
     def __init__(self, base_wait):
+        """Store the wrapped Tenacity wait callable used as a baseline."""
         self._base_wait = base_wait
 
     def __call__(self, retry_state):
+        """Return the greater of base delay or Retry-After header guidance."""
         base_delay = self._base_wait(retry_state) if self._base_wait else 0
         exc = None
         if retry_state.outcome is not None:
@@ -542,16 +546,19 @@ class _PipeJob:
 
     @property
     def session_id(self) -> str:
+        """Convenience accessor for the metadata session identifier."""
         return str(self.metadata.get("session_id") or "")
 
     @property
     def user_id(self) -> str:
+        """Return the Open WebUI user id associated with the job."""
         return str(self.user.get("id") or self.metadata.get("user_id") or "")
 
 
 # Tool Execution ----------------------------------------------------
 @dataclass(slots=True)
 class _QueuedToolCall:
+    """Stores a pending tool call plus execution metadata for worker pools."""
     call: dict[str, Any]
     tool_cfg: dict[str, Any]
     args: dict[str, Any]
@@ -561,6 +568,7 @@ class _QueuedToolCall:
 
 @dataclass(slots=True)
 class _ToolExecutionContext:
+    """Holds shared state for executing tool calls within breaker limits."""
     queue: asyncio.Queue[_QueuedToolCall | None]
     per_request_semaphore: asyncio.Semaphore
     global_semaphore: asyncio.Semaphore | None
@@ -924,6 +932,7 @@ class OpenRouterModelRegistry:
 
     @classmethod
     def _record_refresh_success(cls, cache_seconds: int) -> None:
+        """Reset refresh backoff bookkeeping after a successful catalog fetch."""
         now = time.time()
         cls._last_fetch = now
         cls._next_refresh_after = now + max(5, cache_seconds)
@@ -933,6 +942,7 @@ class OpenRouterModelRegistry:
 
     @classmethod
     def _record_refresh_failure(cls, exc: Exception, cache_seconds: int) -> None:
+        """Increase backoff delay and track the most recent catalog error."""
         cls._consecutive_failures += 1
         cls._last_error = str(exc)
         cls._last_error_time = time.time()
@@ -1015,6 +1025,7 @@ class OpenRouterModelRegistry:
         """Translate metadata into Open WebUI capability checkboxes."""
 
         def _normalize(values: list[Any]) -> set[str]:
+            """Return a normalized lowercase set from the provider metadata."""
             normalized: set[str] = set()
             for item in values:
                 if isinstance(item, str):
@@ -1211,6 +1222,7 @@ class OpenRouterAPIError(RuntimeError):
         model_slug: Optional[str] = None,
         requested_model: Optional[str] = None,
     ) -> None:
+        """Normalize raw OpenRouter metadata into convenient attributes."""
         self.status = status
         self.reason = reason
         self.provider = provider
@@ -1310,6 +1322,7 @@ def _format_openrouter_error_markdown(
     api_model_id: Optional[str],
     template: str,
 ) -> str:
+    """Render a provider error into markdown after enriching with model context."""
     model_display, diagnostics, metrics = _resolve_error_model_context(
         error,
         normalized_model_id=normalized_model_id,
@@ -1572,6 +1585,7 @@ class ResponsesBody(BaseModel):
             return None
 
         def _compute_turn_indices() -> tuple[list[Optional[int]], int]:
+            """Label each message with a turn index and return the total count."""
             indices: list[Optional[int]] = []
             current_turn = -1
             max_turn = -1
@@ -1602,6 +1616,7 @@ class ResponsesBody(BaseModel):
             return indices, total_turns
 
         def _markdown_images_from_text(text: str) -> list[str]:
+            """Extract inline Markdown image URLs from a text block."""
             if not isinstance(text, str):
                 return []
             return [
@@ -1611,6 +1626,7 @@ class ResponsesBody(BaseModel):
             ]
 
         def _is_old_turn(turn_index: Optional[int], *, threshold: Optional[int]) -> bool:
+            """Return True when a message turn falls outside the retention window."""
             return (
                 threshold is not None
                 and turn_index is not None
@@ -1624,6 +1640,7 @@ class ResponsesBody(BaseModel):
             turn_index: Optional[int],
             retention_turns: int,
         ) -> bool:
+            """Shorten oversized tool output strings while leaving markers intact."""
             if item.get("type") != "function_call_output":
                 return False
 
@@ -1743,6 +1760,7 @@ class ResponsesBody(BaseModel):
                         storage_context: Optional[Tuple[Optional[Request], Optional[Any]]] = None
 
                         async def _get_storage_context() -> tuple[Optional[Request], Optional[Any]]:
+                            """Resolve (request,user) tuple only once for storage uploads."""
                             nonlocal storage_context
                             if storage_context is None:
                                 storage_context = await self._resolve_storage_context(__request__, user_obj)
@@ -1754,6 +1772,7 @@ class ResponsesBody(BaseModel):
                             preferred_name: str,
                             status_message: str,
                         ) -> Optional[str]:
+                            """Upload image bytes to Open WebUI storage and emit status."""
                             upload_request, upload_user = await _get_storage_context()
                             if not (upload_request and upload_user):
                                 return None
@@ -1890,11 +1909,13 @@ class ResponsesBody(BaseModel):
                         file_url = source.get("file_url")
 
                         def _is_internal_storage(url: str) -> bool:
+                            """Return True when a URL already references internal storage."""
                             return isinstance(url, str) and ("/api/v1/files/" in url or "/files/" in url)
 
                         storage_context: Optional[Tuple[Optional[Request], Optional[Any]]] = None
 
                         async def _get_storage_context() -> tuple[Optional[Request], Optional[Any]]:
+                            """Lazy-load the request/user pair used for uploads."""
                             nonlocal storage_context
                             if storage_context is None:
                                 storage_context = await self._resolve_storage_context(__request__, user_obj)
@@ -1907,6 +1928,7 @@ class ResponsesBody(BaseModel):
                             preferred_name: Optional[str],
                             status_message: str,
                         ) -> Optional[str]:
+                            """Persist arbitrary bytes to Open WebUI storage and emit status."""
                             upload_request, upload_user = await _get_storage_context()
                             if not (upload_request and upload_user):
                                 return None
@@ -1936,6 +1958,7 @@ class ResponsesBody(BaseModel):
                             *,
                             name_hint: Optional[str] = None,
                         ) -> Optional[str]:
+                            """Download a remote file and persist it via `_save_bytes_to_storage`."""
                             downloaded = await self._download_remote_url(remote_url)
                             if not downloaded:
                                 return None
