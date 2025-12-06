@@ -1,0 +1,254 @@
+2025-12-06 23:02:57.861 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 159.196.244.190:0 - "GET /_app/immutable/chunks/BARylDlP.js HTTP/1.1" 304
+
+
+2025-12-06 23:03:10.057 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 159.196.244.190:0 - "POST /api/v1/utils/code/format HTTP/1.1" 200
+2025-12-06 23:03:10.097 | INFO     | open_webui.utils.plugin:install_frontmatter_requirements:271 - Installing requirements: git+https://github.com/rbb-dev/openrouter_responses_pipe.git@feature/modular-split
+Collecting git+https://github.com/rbb-dev/openrouter_responses_pipe.git@feature/modular-split
+  Cloning https://github.com/rbb-dev/openrouter_responses_pipe.git (to revision feature/modular-split) to /tmp/pip-req-build-ukmc7t4y
+  Running command git clone --filter=blob:none --quiet https://github.com/rbb-dev/openrouter_responses_pipe.git /tmp/pip-req-build-ukmc7t4y
+  Running command git checkout -b feature/modular-split --track origin/feature/modular-split
+  Switched to a new branch 'feature/modular-split'
+  Resolved https://github.com/rbb-dev/openrouter_responses_pipe.git to commit 32233d79a053bf891ff90537d5ab7624653d1cae
+  branch 'feature/modular-split' set up to track 'origin/feature/modular-split'.
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Getting requirements to build wheel: started
+  Getting requirements to build wheel: finished with status 'error'
+  error: subprocess-exited-with-error
+
+  × Getting requirements to build wheel did not run successfully.
+  │ exit code: 1
+  ╰─> [44 lines of output]
+      /tmp/pip-build-env-8xfzdkh5/overlay/lib/python3.11/site-packages/setuptools/config/_apply_pyprojecttoml.py:75: _MissingDynamic: `classifiers` defined outside of `pyproject.toml` is ignored.
+      !!
+
+              ********************************************************************************
+              The following seems to be defined outside of `pyproject.toml`:
+
+              `classifiers = ['Development Status :: 4 - Beta', 'Intended Audience :: Developers', 'License :: OSI Approved :: MIT License', 'Programming Language :: Python :: 3.10', 'Programming Language :: Python :: 3.11', 'Programming Language :: Python :: 3.12', 'Topic :: Software Development :: Libraries :: Python Modules']`
+
+              According to the spec (see the link below), however, setuptools CANNOT
+              consider this value unless `classifiers` is listed as `dynamic`.
+
+              https://packaging.python.org/en/latest/specifications/pyproject-toml/#declaring-project-metadata-the-project-table
+
+              To prevent this problem, you can list `classifiers` under `dynamic` or alternatively
+              remove the `[project]` table from your file and rely entirely on other means of
+              configuration.
+              ********************************************************************************
+
+      !!
+        _handle_missing_dynamic(dist, project_table)
+      /tmp/pip-build-env-8xfzdkh5/overlay/lib/python3.11/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsDeprecationWarning: `project.license` as a TOML table is deprecated
+      !!
+
+              ********************************************************************************
+              Please use a simple string containing a SPDX expression for `project.license`. You can also use `project.license-files`. (Both options available on setuptools>=77.0.0).
+
+              By 2026-Feb-18, you need to update your project and remove deprecated calls
+              or your builds will no longer be supported.
+
+              See https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#license for details.
+              ********************************************************************************
+
+      !!
+        corresp(dist, value, root_dir)
+      /tmp/pip-build-env-8xfzdkh5/overlay/lib/python3.11/site-packages/setuptools/config/_apply_pyprojecttoml.py:82: SetuptoolsWarning: `install_requires` overwritten in `pyproject.toml` (dependencies)
+        corresp(dist, value, root_dir)
+      running egg_info
+      creating src/openrouter_responses_pipe.egg-info
+      writing src/openrouter_responses_pipe.egg-info/PKG-INFO
+      writing dependency_links to src/openrouter_responses_pipe.egg-info/dependency_links.txt
+      writing requirements to src/openrouter_responses_pipe.egg-info/requires.txt
+      writing top-level names to src/openrouter_responses_pipe.egg-info/top_level.txt
+      writing manifest file 'src/openrouter_responses_pipe.egg-info/SOURCES.txt'
+      error: package directory 'src/openrouter_responses_pipe' does not exist
+      [end of output]
+
+  note: This error originates from a subprocess, and is likely not a problem with pip.
+error: subprocess-exited-with-error
+
+× Getting requirements to build wheel did not run successfully.
+│ exit code: 1
+╰─> See above for output.
+
+note: This error originates from a subprocess, and is likely not a problem with pip.
+
+[notice] A new release of pip is available: 24.0 -> 25.3
+[notice] To update, run: pip install --upgrade pip
+2025-12-06 23:03:15.036 | ERROR    | open_webui.utils.plugin:install_frontmatter_requirements:279 - Error installing packages: git+https://github.com/rbb-dev/openrouter_responses_pipe.git@feature/modular-split
+2025-12-06 23:03:15.036 | ERROR    | open_webui.routers.functions:create_new_function:224 - Failed to create a new function: Command '['/usr/local/bin/python3', '-m', 'pip', 'install', 'git+https://github.com/rbb-dev/openrouter_responses_pipe.git@feature/modular-split']' returned non-zero exit status 1.
+Traceback (most recent call last):
+
+  File "<string>", line 1, in <module>
+  File "/usr/local/lib/python3.11/multiprocessing/spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+               │     │   └ 4
+               │     └ 17
+               └ <function _main at 0xf6f781af62a0>
+  File "/usr/local/lib/python3.11/multiprocessing/spawn.py", line 135, in _main
+    return self._bootstrap(parent_sentinel)
+           │    │          └ 4
+           │    └ <function BaseProcess._bootstrap at 0xf6f781d60a40>
+           └ <SpawnProcess name='SpawnProcess-3' parent=1 started>
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+    │    └ <function BaseProcess.run at 0xf6f781f4ff60>
+    └ <SpawnProcess name='SpawnProcess-3' parent=1 started>
+  File "/usr/local/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+    │    │        │    │        │    └ {'config': <uvicorn.config.Config object at 0xf6f781af24d0>, 'target': <bound method Process.target of <uvicorn.supervisors.m...
+    │    │        │    │        └ <SpawnProcess name='SpawnProcess-3' parent=1 started>
+    │    │        │    └ ()
+    │    │        └ <SpawnProcess name='SpawnProcess-3' parent=1 started>
+    │    └ <function subprocess_started at 0xf6f780d3d3a0>
+    └ <SpawnProcess name='SpawnProcess-3' parent=1 started>
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+    │              └ [<socket.socket fd=3, family=2, type=1, proto=0, laddr=('0.0.0.0', 8080)>]
+    └ <bound method Process.target of <uvicorn.supervisors.multiprocess.Process object at 0xf6f780bdcd90>>
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/supervisors/multiprocess.py", line 63, in target
+    return self.real_target(sockets)
+           │    │           └ [<socket.socket fd=3, family=2, type=1, proto=0, laddr=('0.0.0.0', 8080)>]
+           │    └ <bound method Server.run of <uvicorn.server.Server object at 0xf6f780bdced0>>
+           └ <uvicorn.supervisors.multiprocess.Process object at 0xf6f780bdcd90>
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/server.py", line 67, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           │           │    │             │                      │    │      └ <function Config.get_loop_factory at 0xf6f780f60360>
+           │           │    │             │                      │    └ <uvicorn.config.Config object at 0xf6f781af24d0>
+           │           │    │             │                      └ <uvicorn.server.Server object at 0xf6f780bdced0>
+           │           │    │             └ [<socket.socket fd=3, family=2, type=1, proto=0, laddr=('0.0.0.0', 8080)>]
+           │           │    └ <function Server.serve at 0xf6f780d3c220>
+           │           └ <uvicorn.server.Server object at 0xf6f780bdced0>
+           └ <function asyncio_run at 0xf6f780d3c0e0>
+  File "/usr/local/lib/python3.11/site-packages/uvicorn/_compat.py", line 23, in asyncio_run
+    return runner.run(main)
+           │      │   └ <coroutine object Server.serve at 0xf6f780b27880>
+           │      └ <function Runner.run at 0xf6f78121d4e0>
+           └ <asyncio.runners.Runner object at 0xf6f781af2290>
+  File "/usr/local/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           │    │     │                  └ <Task pending name='Task-1' coro=<Server.serve() running at /usr/local/lib/python3.11/site-packages/uvicorn/server.py:71> wai...
+           │    │     └ <cyfunction Loop.run_until_complete at 0xf6f780bce5c0>
+           │    └ <uvloop.Loop running=True closed=False debug=False>
+           └ <asyncio.runners.Runner object at 0xf6f781af2290>
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+          │    │   │      │                      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.send_no_error at 0xf6f6d8744180>
+          │    │   │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │    │   └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          │    └ <starlette_compress.CompressMiddleware object at 0xf6f77fb844f0>
+          └ <open_webui.main.RedirectMiddleware object at 0xf6f749c88790>
+  File "/usr/local/lib/python3.11/site-packages/starlette_compress/__init__.py", line 92, in __call__
+    return await self._zstd(scope, receive, send)
+                 │    │     │      │        └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.send_no_error at 0xf6f6d8744180>
+                 │    │     │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+                 │    │     └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+                 │    └ <member '_zstd' of 'CompressMiddleware' objects>
+                 └ <starlette_compress.CompressMiddleware object at 0xf6f77fb844f0>
+  File "/usr/local/lib/python3.11/site-packages/starlette_compress/_zstd_legacy.py", line 100, in __call__
+    await self.app(scope, receive, wrapper)
+          │    │   │      │        └ <function ZstdResponder.__call__.<locals>.wrapper at 0xf6f71f73ade0>
+          │    │   │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │    │   └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          │    └ <member 'app' of 'ZstdResponder' objects>
+          └ <starlette_compress._zstd_legacy.ZstdResponder object at 0xf6f749cce4c0>
+  File "/usr/local/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+          │                            │    │    │     │      │        └ <function ZstdResponder.__call__.<locals>.wrapper at 0xf6f71f73ade0>
+          │                            │    │    │     │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │                            │    │    │     └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          │                            │    │    └ <starlette.requests.Request object at 0xf6f6d98ac8d0>
+          │                            │    └ <fastapi.middleware.asyncexitstack.AsyncExitStackMiddleware object at 0xf6f749b0dd50>
+          │                            └ <starlette.middleware.exceptions.ExceptionMiddleware object at 0xf6f749bf7850>
+          └ <function wrap_app_handling_exceptions at 0xf6f77d3798a0>
+  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+          │   │      │        └ <function wrap_app_handling_exceptions.<locals>.wrapped_app.<locals>.sender at 0xf6f6d9974900>
+          │   │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │   └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          └ <fastapi.middleware.asyncexitstack.AsyncExitStackMiddleware object at 0xf6f749b0dd50>
+  File "/usr/local/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+          │    │   │      │        └ <function wrap_app_handling_exceptions.<locals>.wrapped_app.<locals>.sender at 0xf6f6d9974900>
+          │    │   │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │    │   └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          │    └ <fastapi.routing.APIRouter object at 0xf6f749c77d90>
+          └ <fastapi.middleware.asyncexitstack.AsyncExitStackMiddleware object at 0xf6f749b0dd50>
+  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+          │    │                │      │        └ <function wrap_app_handling_exceptions.<locals>.wrapped_app.<locals>.sender at 0xf6f6d9974900>
+          │    │                │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │    │                └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          │    └ <bound method Router.app of <fastapi.routing.APIRouter object at 0xf6f749c77d90>>
+          └ <fastapi.routing.APIRouter object at 0xf6f749c77d90>
+  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+          │     │      │      │        └ <function wrap_app_handling_exceptions.<locals>.wrapped_app.<locals>.sender at 0xf6f6d9974900>
+          │     │      │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │     │      └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          │     └ <function Route.handle at 0xf6f77d37af20>
+          └ APIRoute(path='/api/v1/functions/create', name='create_new_function', methods=['POST'])
+  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+          │    │   │      │        └ <function wrap_app_handling_exceptions.<locals>.wrapped_app.<locals>.sender at 0xf6f6d9974900>
+          │    │   │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │    │   └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          │    └ <function request_response.<locals>.app at 0xf6f7498fa2a0>
+          └ APIRoute(path='/api/v1/functions/create', name='create_new_function', methods=['POST'])
+  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 125, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+          │                            │    │        │      │        └ <function wrap_app_handling_exceptions.<locals>.wrapped_app.<locals>.sender at 0xf6f6d9974900>
+          │                            │    │        │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │                            │    │        └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          │                            │    └ <starlette.requests.Request object at 0xf6f6d98ac710>
+          │                            └ <function request_response.<locals>.app.<locals>.app at 0xf6f6d9974400>
+          └ <function wrap_app_handling_exceptions at 0xf6f77d3798a0>
+  File "/usr/local/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+          │   │      │        └ <function wrap_app_handling_exceptions.<locals>.wrapped_app.<locals>.sender at 0xf6f6d9977240>
+          │   │      └ <function BaseHTTPMiddleware.__call__.<locals>.call_next.<locals>.receive_or_disconnect at 0xf6f6d8747ce0>
+          │   └ {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.3'}, 'http_version': '1.1', 'server': ('172.18.0.3', 8080), 'c...
+          └ <function request_response.<locals>.app.<locals>.app at 0xf6f6d9974400>
+  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 111, in app
+    response = await f(request)
+                     │ └ <starlette.requests.Request object at 0xf6f6d98ac710>
+                     └ <function get_request_handler.<locals>.app at 0xf6f7498fa0c0>
+  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 391, in app
+    raw_response = await run_endpoint_function(
+                         └ <function run_endpoint_function at 0xf6f77d3c0ea0>
+  File "/usr/local/lib/python3.11/site-packages/fastapi/routing.py", line 290, in run_endpoint_function
+    return await dependant.call(**values)
+                 │         │      └ {'user': UserModel(id='714affbb-d092-4e39-af42-0c59ee82ab8d', email='boris.bakchiev@morristechnology.com.au', username=None, ...
+                 │         └ <function create_new_function at 0xf6f74ab8b9c0>
+                 └ Dependant(path_params=[], query_params=[], header_params=[], cookie_params=[], body_params=[ModelField(field_info=Body(Pydant...
+
+> File "/app/backend/open_webui/routers/functions.py", line 199, in create_new_function
+    function_module, function_type, frontmatter = load_function_module_by_id(
+                                                  └ <function load_function_module_by_id at 0xf6f74b927560>
+
+  File "/app/backend/open_webui/utils/plugin.py", line 129, in load_function_module_by_id
+    install_frontmatter_requirements(frontmatter.get("requirements", ""))
+    │                                │           └ <method 'get' of 'dict' objects>
+    │                                └ {'title': 'OpenRouter Responses API Manifold', 'author': 'rbb-dev', 'author_url': 'https://github.com/rbb-dev', 'git_url': 'h...
+    └ <function install_frontmatter_requirements at 0xf6f74b784d60>
+
+  File "/app/backend/open_webui/utils/plugin.py", line 280, in install_frontmatter_requirements
+    raise e
+
+  File "/app/backend/open_webui/utils/plugin.py", line 272, in install_frontmatter_requirements
+    subprocess.check_call(
+    │          └ <function check_call at 0xf6f781e23380>
+    └ <module 'subprocess' from '/usr/local/lib/python3.11/subprocess.py'>
+
+  File "/usr/local/lib/python3.11/subprocess.py", line 413, in check_call
+    raise CalledProcessError(retcode, cmd)
+          │                  │        └ ['/usr/local/bin/python3', '-m', 'pip', 'install', 'git+https://github.com/rbb-dev/openrouter_responses_pipe.git@feature/modu...
+          │                  └ 1
+          └ <class 'subprocess.CalledProcessError'>
+
+subprocess.CalledProcessError: Command '['/usr/local/bin/python3', '-m', 'pip', 'install', 'git+https://github.com/rbb-dev/openrouter_responses_pipe.git@feature/modular-split']' returned non-zero exit status 1.
+2025-12-06 23:03:15.043 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 159.196.244.190:0 - "POST /api/v1/functions/create HTTP/1.1" 400
+2025-12-06 23:03:16.916 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 159.196.244.190:0 - "GET /_app/version.json HTTP/1.1" 200
+2025-12-06 23:03:20.834 | INFO     | uvicorn.protocols.http.httptools_impl:send:476 - 104.28.250.151:0 - "GET /_app/version.json HTTP/1.1" 200
+
