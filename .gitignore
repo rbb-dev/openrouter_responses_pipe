@@ -4,4 +4,12 @@ __pycache__/
 .claude/
 .vscode/
 .external/
-openrouter_responses_pipe.egg-info/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Working files
+src/monolith_working.py
+error.log
