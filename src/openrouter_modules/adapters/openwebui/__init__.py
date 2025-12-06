@@ -29,6 +29,11 @@ from .file_handler import (
     is_safe_url,
     is_safe_url_blocking,
 )
+from .tools import (
+    _QueuedToolCall,
+    _ToolExecutionContext,
+    ToolExecutionAdapter,
+)
 
 __all__ = [
     "ArtifactPersistence",
@@ -47,4 +52,7 @@ __all__ = [
     "is_youtube_url",
     "is_safe_url",
     "is_safe_url_blocking",
+    "_QueuedToolCall",
+    "_ToolExecutionContext",
+    "ToolExecutionAdapter",
 ]
