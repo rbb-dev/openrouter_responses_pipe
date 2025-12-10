@@ -20,7 +20,7 @@ This note collects the features that are unique to the OpenRouter variant of the
   * Breaks out reasoning tokens explicitly because OpenRouter exposes them per request.
 * Controlled by valves:
   * `SHOW_FINAL_USAGE_STATUS` (system + user) toggles the entire final status block.
-  * `STREAMING_UPDATE_PROFILE` and related valves influence how quickly interim token counts appear.
+  * Streaming deltas now pass through without batching; interim token counts appear as soon as OpenRouter emits them.
 
 ---
 

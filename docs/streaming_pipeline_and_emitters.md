@@ -20,16 +20,9 @@ OpenRouter SSE → chunk queue → worker pool → event queue → emitters → 
 
 ---
 
-## 2. update batching & latency knobs
+## 2. update behavior (no server-side batching)
 
-| Setting | Default | Effect |
-| --- | --- | --- |
-| `STREAMING_UPDATE_PROFILE` | `None` (respect char + idle valves) | Shortcut for the presets defined in `_STREAMING_PRESETS` (`quick`, `normal`, `slow`). Applies both `char_limit` and `idle_flush_ms`. |
-| `STREAMING_UPDATE_CHAR_LIMIT` | 20 chars | Maximum characters per `_emit_update` batch. Lower = lower latency with more events. |
-| `STREAMING_IDLE_FLUSH_MS` | 250 ms | Idle watchdog. If no new text arrives before the timer expires, the buffer flushes even if it hasn"t hit the char limit. |
-| User overrides | Same fields exist on `Pipe.UserValves`. Individuals can pick a different preset/limit without affecting others. |
-
-Buffers also respect Unicode boundaries: `_emit_update` tracks surrogate pairs and waits for both halves of a UTF-16 pair before flushing so emoji and CJK characters are never split.
+The pipe forwards deltas immediately after normalization (`_normalize_surrogate_chunk` handles Unicode safety), so clients receive the same cadence OpenRouter emits.
 
 ---
 

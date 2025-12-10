@@ -81,7 +81,7 @@ Operational guidance:
 ## 5. Streaming Pipeline
 
 - SSE producer pumps raw chunks into a bounded queue; multiple worker tasks parse them and enforce in-order delivery via sequence IDs.
-- Text deltas are batched up to `STREAMING_UPDATE_CHAR_LIMIT` characters (or until `STREAMING_IDLE_FLUSH_MS` elapses) to balance latency vs. event spam.
+- Text deltas are forwarded immediately; event volume now matches whatever cadence the upstream model produces.
 - A surrogate-pair normalizer ensures UTF-16 pairs aren"t split across updates, preventing Unicode corruption during streaming.
 - Citation annotations are now surfaced via dedicated `_emit_citation` events instead of mutating the streaming text with ad-hoc `[n]` markers, which keeps downstream renderers (including Open WebUI) in sync and avoids race conditions when the output buffer retransmits.
 

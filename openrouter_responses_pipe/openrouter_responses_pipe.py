@@ -3,14 +3,15 @@ title: OpenRouter Responses API Manifold
 author: rbb-dev
 author_url: https://github.com/rbb-dev
 git_url: https://github.com/rbb-dev/openrouter_responses_pipe/
-original_author: jrkropp
-original_author_url: https://github.com/jrkropp/open-webui-developer-toolkit
+id: open_webui_openrouter_responses_pipe
 description: OpenRouter Responses API pipe for Open WebUI
 required_open_webui_version: 0.6.28
-version: 1.0.5
+version: 1.0.9
 requirements: aiohttp, cryptography, fastapi, httpx, lz4, pydantic, pydantic_core, sqlalchemy, tenacity
 license: MIT
 
+- This work was based on excellent work by jrkropp (https://github.com/jrkropp/open-webui-developer-toolkit)
+- It was adapted to be used exclusiively with OpenRouter Responses API and extended with additional features.
 - Auto-discovers and imports full OpenRouter Responses model catalog with capabilities and identifiers.
 - Translates Completions to Responses API, persisting reasoning/tool artifacts per chat via scoped SQLAlchemy tables.
 - Handles 100-500 concurrent users with per-request isolation, async queues, and global semaphores for overload protection (503 rejects).
@@ -115,20 +116,10 @@ from starlette.datastructures import Headers
 
 LOGGER = logging.getLogger(__name__)
 
-
-@dataclass(frozen=True)
-class _StreamingPreferences:
-    """Normalized streaming controls for SSE batching."""
-
-    char_limit: int
-    idle_flush_ms: int
-
-
-_STREAMING_PRESETS: dict[str, _StreamingPreferences] = {
-    "quick": _StreamingPreferences(char_limit=10, idle_flush_ms=100),
-    "normal": _StreamingPreferences(char_limit=20, idle_flush_ms=250),
-    "slow": _StreamingPreferences(char_limit=80, idle_flush_ms=600),
-}
+_REASONING_STATUS_PUNCTUATION = (".", "!", "?", ":", "\n")
+_REASONING_STATUS_MAX_CHARS = 160
+_REASONING_STATUS_MIN_CHARS = 12
+_REASONING_STATUS_IDLE_SECONDS = 0.75
 
 _REMOTE_FILE_MAX_SIZE_DEFAULT_MB = 50
 _REMOTE_FILE_MAX_SIZE_MAX_MB = 500
@@ -718,20 +709,6 @@ def _read_rag_file_constraints() -> tuple[bool, Optional[int]]:
         limit_mb = min(limit_mb, _REMOTE_FILE_MAX_SIZE_MAX_MB)
 
     return rag_enabled, limit_mb
-
-
-def _coerce_streaming_char_limit(value: int) -> int:
-    """Clamp streaming delta size to a safe range (10-500)."""
-
-    return max(10, min(int(value), 500))
-
-
-def _coerce_idle_flush_ms(value: int) -> int:
-    """Return 0 (disabled) or clamp idle flush interval to 50-2000 ms."""
-
-    if value <= 0:
-        return 0
-    return max(50, min(int(value), 2000))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -3197,7 +3174,7 @@ class Pipe:
             description="Maximum size in MB for downloading remote files/images. Files exceeding this limit are skipped. When Open WebUI RAG is enabled, the pipe automatically caps downloads to Open WebUI's FILE_MAX_SIZE (if set).",
         )
         SAVE_REMOTE_FILE_URLS: bool = Field(
-            default=False,
+            default=True,
             description="When True, remote URLs and data URLs in the file_url field are downloaded/parsed and re-hosted in Open WebUI storage. When False, file_url values pass through untouched. Note: This valve only affects the file_url field; see SAVE_FILE_DATA_CONTENT for file_data behavior. Recommended: Keep disabled to avoid unexpected storage growth.",
         )
         SAVE_FILE_DATA_CONTENT: bool = Field(
@@ -3278,7 +3255,7 @@ class Pipe:
             description="Controls the reasoning summary emitted by supported models (auto/concise/detailed). Set to 'disabled' to skip requesting reasoning summaries.",
         )
         PERSIST_REASONING_TOKENS: Literal["disabled", "next_reply", "conversation"] = Field(
-            default="next_reply",
+            default="conversation",
             title="Reasoning retention",
             description="Reasoning retention: 'disabled' keeps nothing, 'next_reply' keeps thoughts only until the following assistant reply finishes, and 'conversation' keeps them for the full chat history.",
         )
@@ -3294,7 +3271,7 @@ class Pipe:
             description="Min 16 chars. Encrypt reasoning tokens (and optionally all persisted artifacts). Changing the key creates a new table; prior artifacts become inaccessible.",
         )
         ENCRYPT_ALL: bool = Field(
-            default=False,
+            default=True,
             description="Encrypt every persisted artifact when ARTIFACT_ENCRYPTION_KEY is set. When False, only reasoning tokens are encrypted.",
         )
         ENABLE_LZ4_COMPRESSION: bool = Field(
@@ -3379,27 +3356,6 @@ class Pipe:
             ge=10,
             le=5000,
             description="Maximum number of parsed SSE events buffered ahead of downstream processing.",
-        )
-        STREAMING_UPDATE_PROFILE: Optional[Literal["quick", "normal", "slow"]] = Field(
-            default=None,
-            description=(
-                "Optional preset for streaming responsiveness. 'quick' prioritizes low latency, "
-                "'normal' balances responsiveness, and 'slow' reduces event volume for constrained clients."
-            ),
-        )
-        STREAMING_UPDATE_CHAR_LIMIT: int = Field(
-            default=20,
-            ge=10,
-            le=500,
-            description="Maximum characters to batch per streaming update. Lower values improve perceived latency.",
-        )
-        STREAMING_IDLE_FLUSH_MS: int = Field(
-            default=250,
-            ge=0,
-            le=2000,
-            description=(
-                "Milliseconds to wait before flushing buffered text when the model pauses. Set to 0 to disable the idle flush watchdog."
-            ),
         )
         OPENROUTER_ERROR_TEMPLATE: str = Field(
             default=DEFAULT_OPENROUTER_ERROR_TEMPLATE,
@@ -3685,22 +3641,6 @@ class Pipe:
             default=True,
             title="Keep tool results",
             description="Persist tool call outputs for later turns (set to Inherit to reuse the workspace default).",
-        )
-        STREAMING_UPDATE_PROFILE: Literal["quick", "normal", "slow"] = Field(
-            default="normal",
-            description="Override the streaming preset (Quick/Normal/Slow) for this user only.",
-        )
-        STREAMING_UPDATE_CHAR_LIMIT: int = Field(
-            default=20,
-            ge=10,
-            le=500,
-            description="User override for streaming update character limit (10-500).",
-        )
-        STREAMING_IDLE_FLUSH_MS: int = Field(
-            default=250,
-            ge=0,
-            le=2000,
-            description="User override for the idle flush interval in milliseconds (0 disables).",
         )
 
     # Core Structure — shared concurrency primitives
@@ -4831,22 +4771,6 @@ class Pipe:
         fallback_identifier = "openrouter"
         self.logger.warning("Pipe identifier missing from metadata; defaulting to '%s'.", fallback_identifier)
         return fallback_identifier
-
-    def _streaming_preferences(self, valves: "Pipe.Valves") -> _StreamingPreferences:
-        """Return sanitized streaming controls after applying optional presets."""
-
-        char_limit = valves.STREAMING_UPDATE_CHAR_LIMIT
-        idle_flush_ms = valves.STREAMING_IDLE_FLUSH_MS
-        preset_name = getattr(valves, "STREAMING_UPDATE_PROFILE", None)
-        if preset_name:
-            preset = _STREAMING_PRESETS.get(preset_name)
-            if preset:
-                char_limit = preset.char_limit
-                idle_flush_ms = preset.idle_flush_ms
-        return _StreamingPreferences(
-            char_limit=_coerce_streaming_char_limit(char_limit),
-            idle_flush_ms=_coerce_idle_flush_ms(idle_flush_ms),
-        )
 
     def _init_artifact_store(
         self,
@@ -6496,7 +6420,6 @@ class Pipe:
         features = dict(_features_all.get(pipe_identifier, {}) or {})
         # Custom location that this manifold uses to store feature flags
         user_id = str(__user__.get("id") or __metadata__.get("user_id") or "")
-        streaming_preferences = self._streaming_preferences(valves)
 
         try:
             result = await self._process_transformed_request(
@@ -6516,7 +6439,6 @@ class Pipe:
                 pipe_identifier_for_artifacts,
                 allowed_norm_ids,
                 features,
-                streaming_preferences=streaming_preferences,
                 user_id=user_id,
             )
         # OpenRouter 400 errors (already have templates)
@@ -6644,12 +6566,10 @@ class Pipe:
         pipe_identifier_for_artifacts: str,
         allowed_norm_ids: set[str],
         features: dict[str, Any],
-        streaming_preferences: _StreamingPreferences | None = None,
         *,
         user_id: str = "",
     ) -> AsyncGenerator[str, None] | str | None:
         user_id = user_id or str(__user__.get("id") or __metadata__.get("user_id") or "")
-        effective_streaming_prefs = streaming_preferences or self._streaming_preferences(valves)
         # Optional: inject CSS tweak for multi-line statuses when enabled.
         if valves.ENABLE_STATUS_CSS_PATCH:
             if __event_call__:
@@ -6848,7 +6768,6 @@ class Pipe:
                     user_id=user_id,
                     request_context=__request__,
                     user_obj=user_model,
-                    streaming_preferences=effective_streaming_prefs,
                 )
             # Return final text (non-streaming)
             return await self._run_nonstreaming_loop(
@@ -6861,7 +6780,6 @@ class Pipe:
                 user_id=user_id,
                 request_context=__request__,
                 user_obj=user_model,
-                streaming_preferences=effective_streaming_prefs,
             )
         except OpenRouterAPIError as exc:
             await self._report_openrouter_error(
@@ -6952,7 +6870,6 @@ class Pipe:
         *,
         request_context: Optional[Request] = None,
         user_obj: Optional[Any] = None,
-        streaming_preferences: _StreamingPreferences | None = None,
     ):
         """
         Stream assistant responses incrementally, handling function calls, status updates, and tool usage.
@@ -6961,12 +6878,7 @@ class Pipe:
             raise RuntimeError("HTTP session is required for streaming")
 
         self.logger.debug("🔧 PERSIST_TOOL_RESULTS=%s", valves.PERSIST_TOOL_RESULTS)
-        prefs = streaming_preferences or self._streaming_preferences(valves)
-        self.logger.debug(
-            "Streaming config: char_limit=%s idle_flush_ms=%s",
-            prefs.char_limit,
-            prefs.idle_flush_ms,
-        )
+        self.logger.debug("Streaming config: direct pass-through (no server batching)")
 
         raw_tools = tools or {}
         tool_registry: dict[str, dict[str, Any]] = {}
@@ -6994,7 +6906,6 @@ class Pipe:
         pending_items: list[dict[str, Any]] = []
         total_usage: dict[str, Any] = {}
         reasoning_buffer = ""
-        reasoning_chunk = ""  # Accumulate tokens until we have a meaningful chunk to display
         reasoning_completed_emitted = False
         reasoning_stream_active = False
         ordinal_by_url: dict[str, int] = {}
@@ -7012,6 +6923,40 @@ class Pipe:
         storage_context_cache: Optional[tuple[Optional[Request], Optional[Any]]] = None
         processed_image_item_ids: set[str] = set()
         generated_image_count = 0
+        reasoning_status_buffer = ""
+        reasoning_status_last_emit: float | None = None
+
+        async def _maybe_emit_reasoning_status(delta_text: str, *, force: bool = False) -> None:
+            """Emit readable status updates for reasoning text without flooding."""
+            nonlocal reasoning_status_buffer, reasoning_status_last_emit
+            if not event_emitter:
+                return
+            reasoning_status_buffer += delta_text
+            text = reasoning_status_buffer.strip()
+            if not text:
+                return
+            should_emit = force
+            now = perf_counter()
+            if not should_emit:
+                if delta_text.rstrip().endswith(_REASONING_STATUS_PUNCTUATION):
+                    should_emit = True
+                elif len(text) >= _REASONING_STATUS_MAX_CHARS:
+                    should_emit = True
+                else:
+                    elapsed = None if reasoning_status_last_emit is None else (now - reasoning_status_last_emit)
+                    if len(text) >= _REASONING_STATUS_MIN_CHARS:
+                        if elapsed is None or elapsed >= _REASONING_STATUS_IDLE_SECONDS:
+                            should_emit = True
+            if not should_emit:
+                return
+            await event_emitter(
+                {
+                    "type": "status",
+                    "data": {"description": text, "done": False},
+                }
+            )
+            reasoning_status_buffer = ""
+            reasoning_status_last_emit = now
 
         async def _get_storage_context() -> tuple[Optional[Request], Optional[Any]]:
             nonlocal storage_context_cache
@@ -7289,8 +7234,8 @@ class Pipe:
                     base_url=valves.BASE_URL,
                     workers=valves.SSE_WORKERS_PER_REQUEST,
                     breaker_key=user_id or None,
-                    delta_char_limit=prefs.char_limit,
-                    idle_flush_ms=prefs.idle_flush_ms,
+                    delta_char_limit=0,
+                    idle_flush_ms=0,
                     chunk_queue_maxsize=valves.STREAMING_CHUNK_QUEUE_MAXSIZE,
                     event_queue_maxsize=valves.STREAMING_EVENT_QUEUE_MAXSIZE,
                 ):
@@ -7328,10 +7273,8 @@ class Pipe:
                             if normalized_delta:
                                 note_generation_activity()
                                 reasoning_buffer += normalized_delta
-                                reasoning_chunk += normalized_delta
 
                                 if event_emitter:
-                                    # Emit reasoning:delta for components that support it
                                     await event_emitter(
                                         {
                                             "type": "reasoning:delta",
@@ -7343,38 +7286,10 @@ class Pipe:
                                         }
                                     )
 
-                                    # Emit status with accumulated chunk when we have enough content
-                                    # Emit on sentence boundaries (. ! ?) or when chunk reaches ~150 chars
-                                    should_emit = (
-                                        normalized_delta.rstrip().endswith(('.', '!', '?', ':', '\n')) or
-                                        len(reasoning_chunk) >= 150
-                                    )
-
-                                    if should_emit and reasoning_chunk.strip():
-                                        await event_emitter(
-                                            {
-                                                "type": "status",
-                                                "data": {
-                                                    "description": reasoning_chunk.strip(),
-                                                    "done": False,
-                                                },
-                                            }
-                                        )
-                                        reasoning_chunk = ""  # Reset chunk after emitting
+                                    await _maybe_emit_reasoning_status(normalized_delta)
                             if etype.endswith(".done") or etype.endswith(".completed"):
                                 if event_emitter:
-                                    # Emit any remaining chunk before completing
-                                    if reasoning_chunk.strip():
-                                        await event_emitter(
-                                            {
-                                                "type": "status",
-                                                "data": {
-                                                    "description": reasoning_chunk.strip(),
-                                                    "done": False,
-                                                },
-                                            }
-                                        )
-                                        reasoning_chunk = ""
+                                    await _maybe_emit_reasoning_status("", force=True)
 
                                     await event_emitter(
                                         {
@@ -7407,7 +7322,15 @@ class Pipe:
                                     }
                                 )
                             assistant_message += normalized_delta
-                            await event_emitter({"type": "chat:message", "data": {"content": assistant_message}})
+                            await event_emitter(
+                                {
+                                    "type": "chat:message",
+                                    "data": {
+                                        "content": assistant_message,
+                                        "delta": normalized_delta,
+                                    },
+                                }
+                            )
                         continue
 
                     # ─── Emit reasoning summary once done ───────────────────────
@@ -7857,7 +7780,6 @@ class Pipe:
         *,
         request_context: Optional[Request] = None,
         user_obj: Optional[Any] = None,
-        streaming_preferences: _StreamingPreferences | None = None,
     ) -> str:
         """Unified implementation: reuse the streaming path.
 
@@ -7889,7 +7811,6 @@ class Pipe:
             user_id=user_id,
             request_context=request_context,
             user_obj=user_obj,
-            streaming_preferences=streaming_preferences,
         )
 
     # 4.4 Task Model Handling
@@ -7998,7 +7919,7 @@ class Pipe:
         *,
         workers: int = 4,
         breaker_key: Optional[str] = None,
-        delta_char_limit: int = 50,
+        delta_char_limit: int = 0,
         idle_flush_ms: int = 0,
         chunk_queue_maxsize: int = 100,
         event_queue_maxsize: int = 100,
@@ -8022,6 +7943,8 @@ class Pipe:
         chunk_sentinel = (None, b"")
         delta_batch_threshold = max(1, int(delta_char_limit))
         idle_flush_seconds = float(idle_flush_ms) / 1000 if idle_flush_ms > 0 else None
+        passthrough_deltas = delta_char_limit <= 0 and idle_flush_ms <= 0
+        requested_model = request_body.get("model")
         producer_error: BaseException | None = None
 
         async def _producer() -> None:
@@ -8164,6 +8087,8 @@ class Pipe:
         delta_length = 0
 
         def flush_delta(force: bool = False) -> Optional[dict[str, Any]]:
+            if passthrough_deltas:
+                return None
             nonlocal delta_buffer, delta_template, delta_length
             if delta_buffer and (force or delta_length >= delta_batch_threshold):
                 combined = "".join(delta_buffer)
@@ -8203,12 +8128,16 @@ class Pipe:
                 while next_seq in pending_events:
                     current = pending_events.pop(next_seq)
                     next_seq += 1
-                    streaming_error = self._extract_streaming_error_event(current, body.model)
+                    streaming_error = self._extract_streaming_error_event(current, requested_model)
                     if streaming_error is not None:
                         raise streaming_error
                     etype = current.get("type")
                     if etype == "response.output_text.delta":
                         delta_chunk = current.get("delta", "")
+                        if passthrough_deltas:
+                            if delta_chunk:
+                                yield current
+                            continue
                         if delta_chunk:
                             delta_buffer.append(delta_chunk)
                             delta_length += len(delta_chunk)

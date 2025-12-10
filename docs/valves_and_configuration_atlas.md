@@ -75,9 +75,6 @@ Valves are the sole configuration surface for the OpenRouter Responses pipe. Thi
 | `SSE_WORKERS_PER_REQUEST` | 4 | 1--8 | SSE parser tasks per request. |
 | `STREAMING_CHUNK_QUEUE_MAXSIZE` | 100 | 10--5000 | Raw chunk buffer limit. |
 | `STREAMING_EVENT_QUEUE_MAXSIZE` | 100 | 10--5000 | Parsed event buffer limit. |
-| `STREAMING_UPDATE_PROFILE` | None | quick/normal/slow | Preset for char + idle bounds. |
-| `STREAMING_UPDATE_CHAR_LIMIT` | 20 | 10--500 | Max characters per streamed delta. |
-| `STREAMING_IDLE_FLUSH_MS` | 250 | 0--2000 | Idle flush watchdog. |
 | `MAX_PARALLEL_TOOLS_GLOBAL` | 200 | 1--2000 | Global tool semaphore. |
 | `MAX_PARALLEL_TOOLS_PER_REQUEST` | 5 | 1--50 | Per-request worker cap. |
 | `TOOL_BATCH_CAP` | 4 | 1--32 | Max compatible tool calls per batch. |
@@ -122,9 +119,6 @@ Per-user overrides mirror global valves where it makes sense. The literal string
 | `REASONING_SUMMARY_MODE` | `auto` | enum | Personal verbosity setting for reasoning summaries. |
 | `PERSIST_REASONING_TOKENS` | `next_reply` | enum | Same semantics as system valve but scoped to the user. |
 | `PERSIST_TOOL_RESULTS` | True | bool | Opt out of tool persistence for a single user. |
-| `STREAMING_UPDATE_PROFILE` | `normal` | enum | User-specific streaming preset. |
-| `STREAMING_UPDATE_CHAR_LIMIT` | 20 | 10--500 | Per-user bound on streaming chunk size. |
-| `STREAMING_IDLE_FLUSH_MS` | 250 | 0--2000 | Per-user idle flush watchdog. |
 
 ---
 
