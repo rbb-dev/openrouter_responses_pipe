@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pydantic
 import pytest
 
-from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
 
 def _ensure_pydantic_backports() -> None:

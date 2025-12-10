@@ -1,7 +1,7 @@
 # testing, bootstrap, and operational playbook
 
 **file:** `docs/testing_bootstrap_and_operations.md`
-**related source:** `pytest_bootstrap.py`, `tests/`, `PRODUCTION_READINESS_AUDIT.md`, startup helpers inside `openrouter_responses_pipe/openrouter_responses_pipe.py`
+**related source:** `pytest_bootstrap.py`, `tests/`, `PRODUCTION_READINESS_AUDIT.md`, startup helpers inside `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py`
 
 This document covers the local developer workflow (tests, linting, fixtures) and the operational checks you should run before/after deploying the pipe into Open WebUI.
 
@@ -9,7 +9,7 @@ This document covers the local developer workflow (tests, linting, fixtures) and
 
 ## 1. local testing workflow
 
-> **Conventions:** All commands below run from the repository root (`openrouter_responses_pipe/`). Paths like `.venv/bin/...` are relative to that root.
+> **Conventions:** All commands below run from the repository root (`Open-WebUI-OpenRouter-pipe/`). Paths like `.venv/bin/...` are relative to that root.
 
 ### 1.1 Python + virtualenv bootstrapping (Open WebUI requires Python 3.12)
 
@@ -22,7 +22,7 @@ python3.12 -m venv .venv
 
 # activate it for the current shell (prompt now shows "(.venv)")
 source .venv/bin/activate
-# (.venv) user@host:openrouter_responses_pipe$
+# (.venv) user@host:Open-WebUI-OpenRouter-pipe$
 
 # run ad-hoc commands without activating the shell-wide venv
 .venv/bin/python -V

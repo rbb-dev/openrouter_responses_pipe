@@ -1,7 +1,7 @@
 # Open WebUI pipe for OpenRouter Responses API
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](https://github.com/rbb-dev/openrouter-responses-pipe)
+[![Version](https://img.shields.io/badge/version-1.0.5-blue.svg)](https://github.com/rbb-dev/Open-WebUI-OpenRouter-pipe)
 [![Open WebUI Compatible](https://img.shields.io/badge/Open%20WebUI-0.6.28%2B-green.svg)](https://openwebui.com/)
 
 A production-grade Open WebUI pipe for OpenRouter's Responses API, built for reliability and scale. Three core capabilities set it apart:
@@ -86,7 +86,7 @@ For detailed technical documentation, see the [Documentation Index](docs/documen
 
 2. **Add the pipe in Open WebUI**
    - Admin → Functions → New Function.
-   - Upload the `openrouter_responses_pipe.py` file.
+   - Upload the `open_webui_openrouter_pipe.py` file.
 
 3. **Dependencies**
    - Automatically installed by Open WebUI via the `requirements:` header (`aiohttp`, `cryptography`, `fastapi`, `httpx`, `lz4`, `pydantic`, `sqlalchemy`, `tenacity`, etc.).
@@ -114,7 +114,7 @@ For complete security documentation including encryption setup, key rotation pro
 
 ## Testing
 
-`tests/conftest.py` stubs Open WebUI, FastAPI, SQLAlchemy, pydantic-core, and tenacity so the pipe can be imported without the full server. Because the pytest plugin `openrouter_responses_pipe.pytest_bootstrap` lives inside this repository, set `PYTHONPATH=.` (or install the package in editable mode) whenever you run the suite; otherwise pytest cannot locate the plugin.
+`tests/conftest.py` stubs Open WebUI, FastAPI, SQLAlchemy, pydantic-core, and tenacity so the pipe can be imported without the full server. Because the pytest plugin `open_webui_openrouter_pipe.pytest_bootstrap` lives inside this repository, set `PYTHONPATH=.` (or install the package in editable mode) whenever you run the suite; otherwise pytest cannot locate the plugin.
 
 ```bash
 PYTHONPATH=. .venv/bin/pytest tests/test_multimodal_inputs.py   # multimodal + size guard coverage

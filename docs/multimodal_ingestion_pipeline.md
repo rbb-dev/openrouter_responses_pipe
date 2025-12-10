@@ -1,7 +1,7 @@
 # multimodal intake pipeline
 
 **file:** `docs/multimodal_ingestion_pipeline.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py:1104-2100`, `_download_remote_url`, `_parse_data_url`, `_inline_internal_file_url`
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:1104-2100`, `_download_remote_url`, `_parse_data_url`, `_inline_internal_file_url`
 
 This document is the canonical reference for every image, file, audio, and video pathway that flows through the OpenRouter Responses pipe. Use it whenever you touch `_to_input_image`, `_to_input_file`, `_to_input_audio`, `_to_input_video`, download helpers, or storage fallbacks.
 

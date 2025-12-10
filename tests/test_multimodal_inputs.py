@@ -24,8 +24,8 @@ from unittest.mock import AsyncMock, Mock, patch
 import httpx
 import pytest
 
-import openrouter_responses_pipe.openrouter_responses_pipe as pipe_module
-from openrouter_responses_pipe.openrouter_responses_pipe import (
+import open_webui_openrouter_pipe.open_webui_openrouter_pipe as pipe_module
+from open_webui_openrouter_pipe.open_webui_openrouter_pipe import (
     Pipe,
     ResponsesBody,
     StatusMessages,

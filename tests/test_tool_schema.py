@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from openrouter_responses_pipe.openrouter_responses_pipe import _strictify_schema
+from open_webui_openrouter_pipe.open_webui_openrouter_pipe import _strictify_schema
 
 
 def test_strictify_preserves_required_fields():

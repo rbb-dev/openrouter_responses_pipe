@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-import openrouter_responses_pipe.openrouter_responses_pipe as pipe_module
-from openrouter_responses_pipe.openrouter_responses_pipe import Pipe, StatusMessages
+import open_webui_openrouter_pipe.open_webui_openrouter_pipe as pipe_module
+from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe, StatusMessages
 
 
 @pytest.fixture

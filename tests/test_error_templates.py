@@ -8,7 +8,7 @@ import httpx
 @pytest.fixture
 def mock_pipe():
     """Create a mock Pipe instance with valves configured."""
-    from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+    from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
     pipe = Pipe()
     pipe.valves.SUPPORT_EMAIL = "support@example.com"
@@ -123,7 +123,7 @@ class TestNetworkTimeoutError:
     async def test_timeout_exception_caught(self, mock_pipe, mock_event_emitter):
         """Test that TimeoutException is caught and formatted."""
         # Mock registry and process to raise TimeoutException
-        with patch('openrouter_responses_pipe.openrouter_responses_pipe.OpenRouterModelRegistry') as mock_registry:
+        with patch('open_webui_openrouter_pipe.open_webui_openrouter_pipe.OpenRouterModelRegistry') as mock_registry:
             mock_registry.ensure_loaded = AsyncMock()
             mock_registry.list_models.return_value = [{"norm_id": "test-model"}]
 
@@ -158,7 +158,7 @@ class TestConnectionError:
     @pytest.mark.asyncio
     async def test_connect_error_caught(self, mock_pipe, mock_event_emitter):
         """Test that ConnectError is caught and formatted."""
-        with patch('openrouter_responses_pipe.openrouter_responses_pipe.OpenRouterModelRegistry') as mock_registry:
+        with patch('open_webui_openrouter_pipe.open_webui_openrouter_pipe.OpenRouterModelRegistry') as mock_registry:
             mock_registry.ensure_loaded = AsyncMock()
             mock_registry.list_models.return_value = [{"norm_id": "test-model"}]
 
@@ -199,7 +199,7 @@ class TestServiceError:
 
         error = httpx.HTTPStatusError("502", request=MagicMock(), response=mock_response)
 
-        with patch('openrouter_responses_pipe.openrouter_responses_pipe.OpenRouterModelRegistry') as mock_registry:
+        with patch('open_webui_openrouter_pipe.open_webui_openrouter_pipe.OpenRouterModelRegistry') as mock_registry:
             mock_registry.ensure_loaded = AsyncMock()
             mock_registry.list_models.return_value = [{"norm_id": "test-model"}]
 
@@ -234,7 +234,7 @@ class TestInternalError:
     @pytest.mark.asyncio
     async def test_generic_exception_caught(self, mock_pipe, mock_event_emitter):
         """Test that any exception is caught and formatted."""
-        with patch('openrouter_responses_pipe.openrouter_responses_pipe.OpenRouterModelRegistry') as mock_registry:
+        with patch('open_webui_openrouter_pipe.open_webui_openrouter_pipe.OpenRouterModelRegistry') as mock_registry:
             mock_registry.ensure_loaded = AsyncMock()
             mock_registry.list_models.return_value = [{"norm_id": "test-model"}]
 
@@ -272,7 +272,7 @@ class TestTemplateCustomization:
         """Test that custom templates from valves are used."""
         mock_pipe.valves.INTERNAL_ERROR_TEMPLATE = "Custom error: {error_type}"
 
-        with patch('openrouter_responses_pipe.openrouter_responses_pipe.OpenRouterModelRegistry') as mock_registry:
+        with patch('open_webui_openrouter_pipe.open_webui_openrouter_pipe.OpenRouterModelRegistry') as mock_registry:
             mock_registry.ensure_loaded = AsyncMock()
             mock_registry.list_models.return_value = [{"norm_id": "test-model"}]
 

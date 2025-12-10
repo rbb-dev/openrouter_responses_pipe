@@ -1,7 +1,7 @@
 # tools, plugins, and extra integrations
 
 **file:** `docs/tooling_and_integrations.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py:308-420, 5790-7100, 8280-8425`
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:308-420, 5790-7100, 8280-8425`
 
 The Responses manifold treats tool calling as a first-class subsystem. This document covers the entire pipeline--how tool schemas are built, how execution queues behave, how breakers protect the system, and how optional integrations (web search, MCP, filter injections) are merged without surprises.
 

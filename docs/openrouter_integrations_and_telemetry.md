@@ -1,7 +1,7 @@
 # openrouter-specific integrations & telemetry
 
 **file:** `docs/openrouter_integrations_and_telemetry.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py`
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py`
 
 This note collects the features that are unique to the OpenRouter variant of the Responses manifold. Use it whenever you need a quick reminder of the “extras” we ship for OpenRouter beyond the baseline OpenAI manifold.
 
@@ -9,7 +9,7 @@ This note collects the features that are unique to the OpenRouter variant of the
 
 ## 1. status telemetry & usage string
 
-* Location: `openrouter_responses_pipe/openrouter_responses_pipe.py` inside `_emit_completion`.
+* Location: `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py` inside `_emit_completion`.
 * When a request finishes, we emit a status message like:
   ```text
   Time: 80.31s  4007.6 tps | Cost $1.163295 | Total tokens: 323103 (Input: 1274, Output: 321829, Reasoning: 315177)

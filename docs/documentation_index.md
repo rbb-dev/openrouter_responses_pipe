@@ -3,7 +3,7 @@
 **file:** `docs/documentation_index.md`
 **scope:** navigation map for every deep-dive document that ships with the OpenRouter Responses pipe.
 
-The `docs/` directory is the canonical reference for this project. It mirrors the structure of the pipe itself: model catalog intake, history reconstruction, multimodal transforms, tool orchestration, streaming, persistence, and operational guardrails. Every file below is AI- and human-friendly, written to stand alone while linking back to the code in `openrouter_responses_pipe/openrouter_responses_pipe.py`.
+The `docs/` directory is the canonical reference for this project. It mirrors the structure of the pipe itself: model catalog intake, history reconstruction, multimodal transforms, tool orchestration, streaming, persistence, and operational guardrails. Every file below is AI- and human-friendly, written to stand alone while linking back to the code in `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py`.
 
 Use this page to decide which document to open next.
 

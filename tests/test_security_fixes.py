@@ -21,7 +21,7 @@ class TestSSRFProtection:
 
     async def test_is_safe_url_public_ip(self):
         """Test that public IPs are allowed."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
@@ -33,7 +33,7 @@ class TestSSRFProtection:
 
     async def test_is_safe_url_localhost(self):
         """Test that localhost is blocked."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
@@ -44,7 +44,7 @@ class TestSSRFProtection:
 
     async def test_is_safe_url_private_network(self):
         """Test that private IP ranges are blocked."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
@@ -61,7 +61,7 @@ class TestSSRFProtection:
 
     async def test_is_safe_url_link_local(self):
         """Test that link-local addresses are blocked (AWS metadata)."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
@@ -71,7 +71,7 @@ class TestSSRFProtection:
 
     async def test_is_safe_url_multicast(self):
         """Test that multicast IPs are blocked."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
@@ -81,7 +81,7 @@ class TestSSRFProtection:
 
     async def test_is_safe_url_dns_failure(self):
         """Test that DNS resolution failures are treated as unsafe."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
@@ -91,7 +91,7 @@ class TestSSRFProtection:
 
     async def test_is_safe_url_disabled(self):
         """Test that SSRF protection can be disabled."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = False
@@ -101,7 +101,7 @@ class TestSSRFProtection:
 
     async def test_is_safe_url_no_hostname(self):
         """Test that URLs without hostname are blocked."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
@@ -115,7 +115,7 @@ class TestYouTubeURLValidation:
 
     def test_is_youtube_url_standard_format(self):
         """Test standard YouTube URL format."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
 
@@ -125,7 +125,7 @@ class TestYouTubeURLValidation:
 
     def test_is_youtube_url_short_format(self):
         """Test short YouTube URL format (youtu.be)."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
 
@@ -134,7 +134,7 @@ class TestYouTubeURLValidation:
 
     def test_is_youtube_url_with_parameters(self):
         """Test YouTube URLs with query parameters."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
 
@@ -143,7 +143,7 @@ class TestYouTubeURLValidation:
 
     def test_is_youtube_url_non_youtube(self):
         """Test that non-YouTube URLs are rejected."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
 
@@ -158,7 +158,7 @@ class TestVideoSizeValidation:
 
     def test_video_size_limit_exceeded(self):
         """Test that oversized base64 videos are rejected."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.VIDEO_MAX_SIZE_MB = 100
@@ -169,7 +169,7 @@ class TestVideoSizeValidation:
 
     def test_video_max_size_valve_default(self):
         """Test that VIDEO_MAX_SIZE_MB valve has correct default."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         assert pipe.valves.VIDEO_MAX_SIZE_MB == 100
@@ -181,7 +181,7 @@ class TestStatusMessages:
 
     def test_status_messages_exist(self):
         """Test that all status message constants are defined."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import StatusMessages
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import StatusMessages
 
         # Image messages
         assert hasattr(StatusMessages, 'IMAGE_BASE64_SAVED')
@@ -202,7 +202,7 @@ class TestStatusMessages:
 
     def test_status_messages_are_strings(self):
         """Test that all status messages are non-empty strings."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import StatusMessages
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import StatusMessages
 
         for attr_name in dir(StatusMessages):
             if not attr_name.startswith('_'):
@@ -216,7 +216,7 @@ class TestRemoteURLDownloadSSRF:
 
     def test_download_remote_url_blocks_private_ip(self):
         """Test that _download_remote_url blocks private IPs."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
@@ -229,7 +229,7 @@ class TestRemoteURLDownloadSSRF:
 
     def test_download_remote_url_allows_public_ip(self):
         """Test that _download_remote_url allows public IPs."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = True
@@ -242,7 +242,7 @@ class TestRemoteURLDownloadSSRF:
 
     def test_download_remote_url_ssrf_protection_disabled(self):
         """Test that _download_remote_url respects ENABLE_SSRF_PROTECTION=False."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         pipe.valves.ENABLE_SSRF_PROTECTION = False
@@ -259,7 +259,7 @@ class TestValveConfigurations:
 
     def test_ssrf_protection_valve_exists(self):
         """Test that ENABLE_SSRF_PROTECTION valve exists with correct default."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         assert hasattr(pipe.valves, 'ENABLE_SSRF_PROTECTION')
@@ -267,7 +267,7 @@ class TestValveConfigurations:
 
     def test_video_max_size_valve_exists(self):
         """Test that VIDEO_MAX_SIZE_MB valve exists with correct range."""
-        from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+        from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
         pipe = Pipe()
         assert hasattr(pipe.valves, 'VIDEO_MAX_SIZE_MB')

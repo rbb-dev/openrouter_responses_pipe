@@ -1,7 +1,7 @@
 # streaming engine & emitters
 
 **file:** `docs/streaming_pipeline_and_emitters.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py:3600-5200` (approx), `SessionLogger` near the file footer
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:3600-5200` (approx), `SessionLogger` near the file footer
 
 The streaming layer converts OpenRouter"s Server-Sent Events (SSE) into the incremental updates Open WebUI expects: text deltas, reasoning traces, tool prompts, citations, notifications, and final usage stats. This document explains every moving part so you can tune latency, add new event types, or debug edge cases without spelunking through the file.
 

@@ -2,7 +2,7 @@
 
 **Last reviewed:** 2025-12-01  
 **Auditor:** Codex (via GPT-5)  
-**Scope:** End-to-end readiness of the OpenRouter Responses manifold with emphasis on multimodal intake, persistence, and concurrency controls. References: `openrouter_responses_pipe/openrouter_responses_pipe.py`, Open WebUI sources and OpenRouter docs.
+**Scope:** End-to-end readiness of the OpenRouter Responses manifold with emphasis on multimodal intake, persistence, and concurrency controls. References: `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py`, Open WebUI sources and OpenRouter docs.
 
 ---
 
@@ -122,7 +122,7 @@ Operational guidance:
 
 ## 10. Testing Notes
 
-- The pytest plugin `openrouter_responses_pipe.pytest_bootstrap` lives at the repo root, so developers must set `PYTHONPATH=.` (or install the repo with `pip install -e .`) before running `pytest`. Without that, Python cannot import the plugin and collection fails with `ModuleNotFoundError: openrouter_responses_pipe`.
+- The pytest plugin `open_webui_openrouter_pipe.pytest_bootstrap` lives at the repo root, so developers must set `PYTHONPATH=.` (or install the repo with `pip install -e .`) before running `pytest`. Without that, Python cannot import the plugin and collection fails with `ModuleNotFoundError: open_webui_openrouter_pipe`.
 - `tests/conftest.py` provides lightweight stubs for Open WebUI, FastAPI, SQLAlchemy, pydantic-core, and tenacity. No external services are required; just activate the `.venv` (Python 3.12) and run the suite.
 
 ---

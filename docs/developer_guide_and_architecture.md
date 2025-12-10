@@ -1,7 +1,7 @@
 # developer overview & architecture map
 
 **file:** `docs/developer_guide_and_architecture.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py`, `pytest_bootstrap.py`, `tests/`
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py`, `pytest_bootstrap.py`, `tests/`
 
 This document explains how the OpenRouter Responses manifold is organized, how requests flow through it, and how to contribute safely. Everything lives in a single Python module for compatibility with Open WebUI pipes, but the code is intentionally segmented into layers that mirror a multi-file project. Use the map below to orient yourself before diving into subsystem deep dives.
 
@@ -9,7 +9,7 @@ This document explains how the OpenRouter Responses manifold is organized, how r
 
 ## 1. layered architecture inside a single file
 
-The pipe is delivered as `openrouter_responses_pipe/openrouter_responses_pipe.py`. Internally it is split into clearly labeled sections:
+The pipe is delivered as `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py`. Internally it is split into clearly labeled sections:
 
 | Section label | Responsibility | Key types/functions |
 | --- | --- | --- |
@@ -45,8 +45,8 @@ Every one of those steps has a companion doc in `docs/` for deeper dives.
 ### 3.1 repo layout
 
 ```
-openrouter_responses_pipe/
-├─ openrouter_responses_pipe.py   # single-file pipe
+open_webui_openrouter_pipe/
+├─ open_webui_openrouter_pipe.py   # single-file pipe
 ├─ pytest_bootstrap.py            # pytest plugin hook
 ├─ docs/                          # this documentation set
 ├─ tests/                         # isolated unit/contract tests
@@ -91,7 +91,7 @@ PY
 ## 5. onboarding checklist
 
 1. Read `docs/documentation_index.md` → `docs/developer_guide_and_architecture.md` (you are here) → the subsystem doc you plan to modify.
-2. Search for existing TODOs inside the target section of `openrouter_responses_pipe.py`. Many have context (e.g., why Redis write-behind is optional or why ProcessPool offload is deferred).
+2. Search for existing TODOs inside the target section of `open_webui_openrouter_pipe.py`. Many have context (e.g., why Redis write-behind is optional or why ProcessPool offload is deferred).
 3. Update or add docs alongside code changes. The docs are opinionated; missing updates will block review.
 4. Run targeted pytest files plus any new coverage you add.
 5. Keep filenames lower-case when adding new docs to stay aligned with the navigation index.

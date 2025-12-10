@@ -1,7 +1,7 @@
 # model catalog & routing intelligence
 
 **file:** `docs/model_catalog_and_routing_intelligence.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py:543-1100`, `Pipe._pick_model`, `Pipe._apply_model_capabilities`
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:543-1100`, `Pipe._pick_model`, `Pipe._apply_model_capabilities`
 
 This document explains how the pipe imports OpenRouter's `/models` catalog, derives per-model capability maps, and applies that metadata when routing user requests. Understanding this layer is essential before tweaking valves such as `MODEL_ID`, `MODEL_CATALOG_REFRESH_SECONDS`, or any of the reasoning/modality toggles.
 

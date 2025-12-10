@@ -1,7 +1,7 @@
 # error handling & user experience
 
 **file:** `docs/error_handling_and_user_experience.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py` (lines 177-265, 3179-3235, 6249-6312, 8236-8310)
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py` (lines 177-265, 3179-3235, 6249-6312, 8236-8310)
 
 This document covers the comprehensive error template system that catches all exception types and renders user-friendly Markdown error cards instead of letting Open WebUI display raw error boxes.
 
@@ -41,7 +41,7 @@ Each template supports Handlebars-style `{{#if variable}}...{{/if}}` conditional
 
 **When it happens:** Request to OpenRouter takes longer than `HTTP_TOTAL_TIMEOUT_SECONDS` (default 120s)
 
-**Default template** (from `openrouter_responses_pipe.py:177-198`):
+**Default template** (from `open_webui_openrouter_pipe.py:177-198`):
 
 ```markdown
 ### ⏱️ Request Timeout
@@ -108,7 +108,7 @@ ERROR [a3f8b2c1d4e5f6a7] Network timeout: httpx.TimeoutException (session=sess_a
 
 **When it happens:** Cannot reach OpenRouter's servers (DNS failure, firewall block, network down)
 
-**Default template** (from `openrouter_responses_pipe.py:200-223`):
+**Default template** (from `open_webui_openrouter_pipe.py:200-223`):
 
 ```markdown
 ### 🔌 Connection Failed
@@ -181,7 +181,7 @@ ERROR [b7c8d9e0f1a2b3c4] Connection failed: httpx.ConnectError('connection refus
 
 **When it happens:** OpenRouter's servers return 500, 502, 503, 504, etc.
 
-**Default template** (from `openrouter_responses_pipe.py:225-243`):
+**Default template** (from `open_webui_openrouter_pipe.py:225-243`):
 
 ```markdown
 ### 🔴 OpenRouter Service Error
@@ -244,7 +244,7 @@ ERROR [c5d6e7f8a9b0c1d2] OpenRouter service error: 502 Bad Gateway (session=sess
 
 **When it happens:** Unexpected bugs, coding errors, or edge cases
 
-**Default template** (from `openrouter_responses_pipe.py:245-265`):
+**Default template** (from `open_webui_openrouter_pipe.py:245-265`):
 
 ```markdown
 ### ⚠️ Unexpected Error
@@ -307,7 +307,7 @@ ERROR [d3e4f5a6b7c8d9e0] Unexpected error: ValueError('invalid model configurati
 
 **When it happens:** OpenRouter rejects the request before processing
 
-**Default template** (from `openrouter_responses_pipe.py:141-175`):
+**Default template** (from `open_webui_openrouter_pipe.py:141-175`):
 
 ```markdown
 ### 🚫 {heading} could not process your request.

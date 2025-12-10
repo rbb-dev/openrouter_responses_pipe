@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from openrouter_responses_pipe.openrouter_responses_pipe import (
+from open_webui_openrouter_pipe.open_webui_openrouter_pipe import (
     CompletionsBody,
     Pipe,
     ResponsesBody,

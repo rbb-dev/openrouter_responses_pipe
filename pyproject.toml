@@ -3,7 +3,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "openrouter-responses-pipe"
+name = "open-webui-openrouter-pipe"
 version = "1.0.5"
 description = "OpenRouter Responses API pipe for Open WebUI"
 readme = "README.md"
@@ -29,7 +29,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/rbb-dev"
-Repository = "https://github.com/rbb-dev/openrouter_responses_pipe/"
+Repository = "https://github.com/rbb-dev/Open-WebUI-OpenRouter-pipe"
 
 [tool.setuptools.packages.find]
-include = ["openrouter_responses_pipe"]
+include = ["open_webui_openrouter_pipe"]

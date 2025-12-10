@@ -4,7 +4,7 @@ import asyncio
 import logging
 import types
 
-from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
 
 def test_wrap_safe_event_emitter_returns_none_for_missing():
@@ -126,7 +126,7 @@ def test_redis_candidate_requires_full_multiworker_env(monkeypatch, caplog):
 def test_redis_candidate_enabled_with_complete_env(monkeypatch):
     dummy_aioredis = types.SimpleNamespace(from_url=lambda *args, **kwargs: None)
     monkeypatch.setattr(
-        "openrouter_responses_pipe.openrouter_responses_pipe.aioredis",
+        "open_webui_openrouter_pipe.open_webui_openrouter_pipe.aioredis",
         dummy_aioredis,
         raising=False,
     )

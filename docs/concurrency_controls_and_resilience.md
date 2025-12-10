@@ -1,7 +1,7 @@
 # concurrency, guardrails, and resilience
 
 **file:** `docs/concurrency_controls_and_resilience.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py:2880-3600`, `tool worker` + `breaker` sections, `_maybe_start_*` helpers
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:2880-3600`, `tool worker` + `breaker` sections, `_maybe_start_*` helpers
 
 OpenRouter workloads are bursty. This pipe is engineered to accept hundreds of concurrent chats without starving the host or corrupting state. This document walks through every concurrency primitive, admission policy, breaker, and watchdog that keeps the manifold stable.
 

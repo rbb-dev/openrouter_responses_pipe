@@ -1,7 +1,7 @@
 # valves & configuration atlas
 
 **file:** `docs/valves_and_configuration_atlas.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py:2421-2870` (Valve definitions) plus accompanying docs referenced below.
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:2421-2870` (Valve definitions) plus accompanying docs referenced below.
 
 Valves are the sole configuration surface for the OpenRouter Responses pipe. This reference mirrors the order of `Pipe.Valves` and `Pipe.UserValves`, groups related toggles, and explains how each value is used at runtime. Defaults reflect the current code; update this file whenever you add or change a valve.
 

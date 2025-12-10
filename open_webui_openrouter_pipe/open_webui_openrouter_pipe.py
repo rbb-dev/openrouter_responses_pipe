@@ -1,9 +1,9 @@
 """
-title: OpenRouter Responses API Manifold
+title: Open WebUI OpenRouter Responses Pipe
 author: rbb-dev
 author_url: https://github.com/rbb-dev
-git_url: https://github.com/rbb-dev/openrouter_responses_pipe/
-id: open_webui_openrouter_responses_pipe
+git_url: https://github.com/rbb-dev/Open-WebUI-OpenRouter-pipe
+id: open_webui_openrouter_pipe
 description: OpenRouter Responses API pipe for Open WebUI
 required_open_webui_version: 0.6.28
 version: 1.0.9
@@ -36,6 +36,7 @@ license: MIT
 from __future__ import annotations
 
 _OPENROUTER_TITLE = "Open WebUI plugin for OpenRouter Responses API"
+_OPENROUTER_REFERER = "https://github.com/rbb-dev/Open-WebUI-OpenRouter-pipe/"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Imports
@@ -1119,6 +1120,7 @@ class OpenRouterModelRegistry:
         headers = {
             "Authorization": f"Bearer {api_key}",
             "X-Title": _OPENROUTER_TITLE,
+            "HTTP-Referer": _OPENROUTER_REFERER,
         }
         _debug_print_request(headers, {"method": "GET", "url": url})
         try:
@@ -3868,6 +3870,7 @@ class Pipe:
         headers = {
             "Authorization": f"Bearer {api_key}",
             "X-Title": _OPENROUTER_TITLE,
+            "HTTP-Referer": _OPENROUTER_REFERER,
         }
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(3),
@@ -7931,6 +7934,7 @@ class Pipe:
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
             "X-Title": _OPENROUTER_TITLE,
+            "HTTP-Referer": _OPENROUTER_REFERER,
         }
         _debug_print_request(headers, request_body)
         url = base_url.rstrip("/") + "/responses"
@@ -8180,6 +8184,7 @@ class Pipe:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
             "X-Title": _OPENROUTER_TITLE,
+            "HTTP-Referer": _OPENROUTER_REFERER,
         }
         _debug_print_request(headers, request_params)
         url = base_url.rstrip("/") + "/responses"

@@ -1,4 +1,4 @@
-from openrouter_responses_pipe.openrouter_responses_pipe import Pipe
+from open_webui_openrouter_pipe.open_webui_openrouter_pipe import Pipe
 
 
 def test_format_final_status_description_includes_cost_tokens_and_tps():

@@ -1,7 +1,7 @@
 # persistence, encryption, and storage
 
 **file:** `docs/persistence_encryption_and_storage.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py:3600-7200`, marker helpers at `openrouter_responses_pipe/openrouter_responses_pipe.py:8132+`
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:3600-7200`, marker helpers at `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:8132+`
 
 The OpenRouter manifold persists reasoning traces, tool inputs/outputs, and other structured artifacts so that regenerations can replay prior context without bloating chat transcripts. This document explains how the storage layer works, how encryption/compression are applied, and how Redis write-behind keeps multi-worker deployments consistent.
 
@@ -53,7 +53,7 @@ def _serialize_marker(ulid: str) -> str:
     return f"[{ulid}{_MARKER_SUFFIX}"
 ```
 
-The snippet above lives at `openrouter_responses_pipe/openrouter_responses_pipe.py:8132+`. When `_persist_artifacts()` stores rows, it appends `_serialize_marker(ulid)` lines to the assistant text; `_transform_messages_to_input()` later scans for those markers, fetches the referenced payloads, and replays them as structured Responses blocks.
+The snippet above lives at `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:8132+`. When `_persist_artifacts()` stores rows, it appends `_serialize_marker(ulid)` lines to the assistant text; `_transform_messages_to_input()` later scans for those markers, fetches the referenced payloads, and replays them as structured Responses blocks.
 
 ---
 

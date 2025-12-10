@@ -1,7 +1,7 @@
 # history reconstruction & context replay
 
 **file:** `docs/history_reconstruction_and_context.md`
-**related source:** `openrouter_responses_pipe/openrouter_responses_pipe.py:1104-2350`, marker helpers at `openrouter_responses_pipe/openrouter_responses_pipe.py:8132-8258`
+**related source:** `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:1104-2350`, marker helpers at `open_webui_openrouter_pipe/open_webui_openrouter_pipe.py:8132-8258`
 
 Open WebUI stores messages as a heterogeneous list of dicts. The OpenRouter Responses API expects a tightly structured `input[]` array with blocks such as `input_text`, `input_image`, `response_text`, and `tool_result`. This document describes how the pipe bridges the two, how persisted artifacts are recovered via ULID markers, and how pruning/retention knobs influence the final payload.
 
