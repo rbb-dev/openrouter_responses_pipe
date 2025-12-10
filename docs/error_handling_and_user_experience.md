@@ -365,6 +365,8 @@ You can mix and match the following placeholders with `{{#if ...}}` blocks:
 | Placeholder | Description |
 | --- | --- |
 | `{heading}` | Friendly label such as `Anthropic: claude-3`. |
+| `{error_id}` / `{timestamp}` | Unique identifier + ISO timestamp injected by `_emit_templated_error()` / `_report_openrouter_error()`. |
+| `{session_id}` / `{user_id}` | Open WebUI session + user identifiers when available. |
 | `{detail}` / `{sanitized_detail}` | Raw provider message (sanitized version escapes backticks). |
 | `{provider}` | Provider name supplied by OpenRouter. |
 | `{model_identifier}`, `{requested_model}`, `{api_model_id}`, `{normalized_model_id}` | Various model ids (Open WebUI, requested alias, canonical slug). |
@@ -375,9 +377,15 @@ You can mix and match the following placeholders with `{{#if ...}}` blocks:
 | `{moderation_reasons}` | Bullet-list of moderation flags (already prefixed with `-`). |
 | `{flagged_excerpt}` | Redacted moderation snippet. |
 | `{raw_body}` | Trimmed raw provider response body. |
+| `{metadata_json}` / `{provider_raw_json}` | Pretty-printed JSON blocks for OpenRouter metadata and the provider's raw error payload. |
 | `{context_limit_tokens}` / `{max_output_tokens}` | Formatted token limits (available only when OpenRouter suggests "middle-out"). |
 | `{include_model_limits}` | Boolean helper used with `{{#if include_model_limits}} ... {{/if}}` to gate the entire limit block. |
 | `{openrouter_message}` / `{upstream_message}` | Original strings from OpenRouter/provider before formatting. |
+| `{native_finish_reason}` | Streaming-only finish reason emitted with `native_finish_reason`. |
+| `{error_chunk_id}` / `{error_chunk_created}` | Identifiers and timestamps for the SSE chunk that contained the error. |
+| `{streaming_provider}` / `{streaming_model}` | Provider/model reported by the streaming event (may differ from the initial request). |
+| `{retry_after_seconds}` / `{rate_limit_type}` | When OpenRouter includes rate-limit hints, these expose the wait window and which limiter triggered. |
+| `{required_cost}` / `{account_balance}` | Present on HTTP 402 responses when OpenRouter tells you how many credits were needed vs. remaining balance. |
 
 ### Customization workflow
 
@@ -417,6 +425,50 @@ ERROR [e1f2a3b4c5d6e7f8] OpenRouter 400: Prompt exceeds context window (session=
 ```
 
 ---
+
+### Mid-stream errors (streaming mode)
+
+When OpenRouter sends an error *after* streaming has started, the pipe now promotes the SSE payload (`response.failed`, `response.error`, or `error`) into an `OpenRouterAPIError`. That means:
+
+1. The error is routed through `_report_openrouter_error()` so the same templating system is used.
+2. Streaming-specific variables (`{native_finish_reason}`, `{error_chunk_id}`, `{streaming_provider}`, `{streaming_model}`) are populated from the SSE event.
+3. The entire SSE payload is preserved via `{provider_raw_json}` and `{metadata_json}` so administrators can inspect the provider’s raw response.
+
+These additions make it clear when a failure happened mid-stream and capture the exact chunk metadata for debugging.
+
+### HTTP-status templates
+
+OpenRouter frequently signals different remediation steps via HTTP status codes, so dedicated templates now exist for each major category:
+
+| Status | Valve | Default guidance |
+| --- | --- | --- |
+| `401 Unauthorized` | `AUTHENTICATION_ERROR_TEMPLATE` | Reminds admins to check API keys / OAuth sessions. |
+| `402 Payment Required` | `INSUFFICIENT_CREDITS_TEMPLATE` | Surfaces `{required_cost}` / `{account_balance}` when OpenRouter includes billing hints. |
+| `408 Request Timeout` | `SERVER_TIMEOUT_TEMPLATE` | Indicates OpenRouter timed out the request (distinct from client-side network timeouts). |
+| `429 Too Many Requests` | `RATE_LIMIT_TEMPLATE` | Surfaces `{retry_after_seconds}` and `{rate_limit_type}` from headers/metadata so users know when to retry. |
+
+Each template accepts the common context placeholders (`{error_id}`, `{timestamp}`, `{session_id}`, `{user_id}`, `{support_email}`, `{support_url}`) plus any fields emitted in the response metadata. You can override these valves the same way as the other templates if your organization has custom guidance for auth, billing, or rate-limit incidents.
+
+**Example override (rate limits):**
+
+```markdown
+### ⏸️ Slow down
+
+Your organization hit the `{rate_limit_type}` limiter on OpenRouter.
+
+**Error ID:** `{error_id}`
+{{#if retry_after_seconds}}
+**Retry after:** {retry_after_seconds}s
+{{/if}}
+{{#if openrouter_message}}
+_Provider hint_: `{openrouter_message}`
+{{/if}}
+
+Next steps:
+1. Wait for the retry window to expire.
+2. Reduce concurrency or token usage.
+3. Contact support ({support_email}) if you require a higher limit.
+```
 
 ## valve configuration
 
@@ -504,6 +556,10 @@ This section explains how to customize error messages for your organization **wi
    - `SERVICE_ERROR_TEMPLATE`
    - `INTERNAL_ERROR_TEMPLATE`
    - `OPENROUTER_ERROR_TEMPLATE`
+   - `AUTHENTICATION_ERROR_TEMPLATE`
+   - `INSUFFICIENT_CREDITS_TEMPLATE`
+   - `RATE_LIMIT_TEMPLATE`
+   - `SERVER_TIMEOUT_TEMPLATE`
 
 ### step 2: understanding placeholders
 
@@ -527,6 +583,20 @@ For **timeout errors**:
 
 For **connection errors**:
 - `{error_type}` – Technical error name (e.g., `ConnectError`)
+
+For **authentication errors (401)**:
+- `{openrouter_message}` – Reason returned by OpenRouter (e.g., “invalid API key”).
+
+For **insufficient credits (402)**:
+- `{required_cost}` – Estimated cost of the attempted request.
+- `{account_balance}` – Credits remaining on the OpenRouter account.
+
+For **rate limits (429)**:
+- `{retry_after_seconds}` – Wait time returned by OpenRouter headers.
+- `{rate_limit_type}` – Scope of the limiter (key/user/account) when provided.
+
+For **OpenRouter timeouts (408)**:
+- `{openrouter_code}` / `{openrouter_message}` – Server-side timeout context.
 
 For **service errors** (5xx):
 - `{status_code}` – HTTP status code (e.g., `502`)
