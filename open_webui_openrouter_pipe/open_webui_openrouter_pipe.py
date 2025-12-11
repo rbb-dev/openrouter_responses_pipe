@@ -3651,35 +3651,36 @@ class Pipe:
 
         SHOW_FINAL_USAGE_STATUS: bool = Field(
             default=True,
-            description="Override whether the final status message includes usage stats (set to Inherit to reuse the workspace default).",
+            title="Show usage details",
+            description="Display tokens, time, and cost at the end of each reply.",
         )
         ENABLE_REASONING: bool = Field(
             default=True,
-            title="Show live reasoning",
-            description="Request live reasoning traces when the model supports them (set to Inherit to reuse the workspace default).",
+            title="Show reasoning steps",
+            description="While the AI works, show its step-by-step reasoning when supported.",
         )
         REASONING_EFFORT: Literal["minimal", "low", "medium", "high"] = Field(
             default="medium",
-            title="Reasoning effort",
-            description="Preferred reasoning effort for supported models (set to Inherit to reuse the workspace default).",
+            title="Reasoning depth",
+            description="Choose how much thinking the AI should do before answering (higher depth is slower but more thorough).",
         )
         REASONING_SUMMARY_MODE: Literal["auto", "concise", "detailed", "disabled"] = Field(
             default="auto",
-            title="Reasoning summary",
-            description="Override how reasoning summaries are requested (auto/concise/detailed/disabled). Set to Inherit to reuse the workspace default.",
+            title="Reasoning explanation detail",
+            description="Pick how detailed the reasoning summary should be (auto, concise, detailed, or hidden).",
         )
         PERSIST_REASONING_TOKENS: Literal["disabled", "next_reply", "conversation"] = Field(
             default="next_reply",
             validation_alias=AliasChoices("PERSIST_REASONING_TOKENS", "next_reply"),
             serialization_alias="next_reply",
             alias="next_reply",
-            title="Reasoning retention",
-            description="Reasoning retention preference (Off, Only for the next reply, or Entire conversation). Set to Inherit to reuse the workspace default.",
+            title="How long to keep reasoning",
+            description="Choose whether reasoning is kept just for the next reply or the entire conversation.",
         )
         PERSIST_TOOL_RESULTS: bool = Field(
             default=True,
-            title="Keep tool results",
-            description="Persist tool call outputs for later turns (set to Inherit to reuse the workspace default).",
+            title="Remember tool and search results",
+            description="Let the AI reuse outputs from tools (for example web searches or other apps) later in the conversation.",
         )
 
     # Core Structure — shared concurrency primitives
