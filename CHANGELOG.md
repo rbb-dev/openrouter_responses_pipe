@@ -103,7 +103,7 @@ _No additional details provided._
 
 ## 2025-11-20 - Propagate cancellations to OpenRouter pipe
 - Commit: `bd29fd30faff4ed94aedff60c67a320475ff83fc`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 Tie each queued job future to its worker task so that Open WebUI stop requests cancel the in flight stream immediately. Also make the top level pipe entrypoint respect asyncio.CancelledError so the caller sees the cancellation and no spurious completion/status events are emitted.
 
@@ -115,7 +115,7 @@ Added a screenshot showing status updates
 
 ## 2025-11-20 - chore: remove unused helpers
 - Commit: `c5f94a3d4a65d3fecf1f79b04e76fdf2e0494b6c`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 Drop the unused ModelRegistry.specs accessor, the temporary _verify_write_behind_cycle debug helper, and the redundant marker helpers so we no longer ship dead code.
 
@@ -127,85 +127,85 @@ _No additional details provided._
 
 ## 2025-11-20 - Fix logging queue threading and tool args
 - Commit: `ac9d1d92e87c68d99d4e2dec1d9216e7721812e3`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-20 - Add timeout to Redis ping warmup
 - Commit: `0a6d22c77080b5b55a69aeb3fe07aedad77d06c8`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-20 - Add turn-aware tool output pruning
 - Commit: `ae416bdd670319b7a1f6f0276f6c8e9843daebb9`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 Introduce a TOOL_OUTPUT_RETENTION_TURNS valve (default 10 turns) and plumb it through ResponsesBody.from_completions so each request can limit how many dialog turns retain full tool outputs. transform_messages_to_input now tracks turn indices while rewriting messages and prunes oversized function_call_output artifacts from older turns, emitting debug logs that describe what was trimmed.
 
 ## 2025-11-20 - Clarify tool-turn retention doc
 - Commit: `92653bdc9ebeb6c0c68905b3e66fe4e06383f48d`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 Update the TOOL_OUTPUT_RETENTION_TURNS valve description to spell out how turns are counted (each user message starts a turn and the subsequent assistant/tool messages share its index). This matches the pruning logic implemented earlier.
 
 ## 2025-11-21 - Allow pipe-id fallback from request model
 - Commit: `39e09caf4bcfa24329e6910efc00b92641e33eba`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 Channels do not populate metadata["model"], so _resolve_pipe_identifier now also looks at the body model string before falling back to self.id. This prevents "Unable to determine pipe identifier" errors when users trigger models inside channels while leaving the behavior for standard chats unchanged.
 
 ## 2025-11-21 - Guard pipe request future failures
 - Commit: `ed2be863a95954aa018e486493fba06680dacdee`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-21 - Gracefully handle catalog refresh errors
 - Commit: `177720247495dd9c4db50b972bb8209b0ff817bf`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-21 - Provide fallback pipe identifier
 - Commit: `c5d0cdfe578768488d316056814afa545a6997c9`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-21 - Handle tool registry load failures
 - Commit: `1352059510e0e7dadf3db24c59f740d844d4a631`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-21 - Harden model function-calling toggle
 - Commit: `08f3d75ccda96c356d902d28b1e6151bb4b366ca`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-21 - Guard citation persistence failures
 - Commit: `815bf2e6e64889b64ad482ab21b0f7d96f81c2a2`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-21 - Wrap event emitters to survive disconnects
 - Commit: `67baba36d309b42095594172859fc76e9facc877`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-21 - Remove duplicate CSS injection log
 - Commit: `68f0710e995ecf9b1d96b2943c1cd9c34f72ae6a`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-21 - Add guard regression tests
 - Commit: `7636ce9e6b940409562e674fdc247d40cafa4354`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
@@ -217,7 +217,7 @@ Added 'Model' field to both Desktop and Smartphone sections for more detailed bu
 
 ## 2025-11-21 - Document architecture and normalize logging
 - Commit: `e9eafb12d781f274b27b7c63fd5df6f3a946a08b`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
@@ -229,43 +229,43 @@ _No additional details provided._
 
 ## 2025-11-21 - Guard replaying orphaned tool artifacts
 - Commit: `4c81877bdf16ddc68f5aae619179ed2b56d22c35`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 Skip rehydrating persisted function_call records that lost their matching outputs, add helper/util coverage, and protect future OpenRouter calls.
 
 ## 2025-11-21 - Stabilize pytest bootstrap and fix Pydantic compat
 - Commit: `fc7b74eb53a503de59c983d821dc6036f3274eeb`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-22 - improve reasoning stream + stop crashing on emojis
 - Commit: `9d210534fb611657e22766178a9af81b4ad8f204`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-22 - Enhance streaming controls and defer OpenRouter warmup until configured
 - Commit: `b5e28ddfd0b8a092d703d3c4444c0faee0e027b1`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-22 - Ignore venv and pytest cache
 - Commit: `b78bedf506beca5b82dc453c46db4ee472ef357a`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 _No additional details provided._
 
 ## 2025-11-23 - Add tuning valves for streaming, tools, and redis
 - Commit: `cb945ab976bfa0fd3037662bcf2003cca708568c`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 - add STREAMING_* queue size controls and thread them through SSE pipeline\n- add TOOL_BATCH_CAP context so batches no longer rely on literals\n- make redis warning/failure thresholds configurable valves\n- document that the module now uses LF line endings instead of CRLF
 
 ## 2025-11-23 - Normalize docs and tests line endings
 - Commit: `ee38d7c901e8f53e4c1d699e641f0f2e666e6d22`
-- Author: Boris Bakchiev
+- Author: rbb-dev
 
 - convert README.md plus the two guard-related test helpers to LF so they match repo style\n- no textual changes, just line-ending normalization
 
